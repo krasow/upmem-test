@@ -1,0 +1,5 @@
+upmem_test
+*.o
+*.out
+*.a
+*.so

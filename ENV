@@ -1,0 +1,4 @@
+export CUDA_HOME="/usr/local/cuda"
+export PATH="/home/david/tools/bin:$PATH"
+export LG_RT_DIR="/home/david/legion/runtime"
+source /home/david/tools/upmem/upmem_env.sh simulator
