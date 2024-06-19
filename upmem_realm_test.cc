@@ -16,9 +16,7 @@ enum {
   CHECK_TASK
 };
 
-enum {
-  DPU_LAUNCH_TASK_BINARY = "dpu_test.up.o"
-}
+#define  DPU_LAUNCH_TASK_BINARY  "dpu_test.up.o"
 
 struct DPUTaskArgs {
   int hi[128];
@@ -28,8 +26,6 @@ static void dpu_launch_task(const void *data, size_t datalen,
                             const void *userdata, size_t userlen, Processor p) {
   assert(datalen == sizeof(DPUTaskArgs));
   DPUTaskArgs task_args = *static_cast<const DPUTaskArgs *>(data);
-
-  DPU_ASSERT(dpu_load( , DPU_LAUNCH_TASK_BINARY, NULL));
   
 
   

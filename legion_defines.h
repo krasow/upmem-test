@@ -11,7 +11,7 @@
  *
  ******************** IMPORTANT ****************************/
 
-#define LEGION_VERSION "legion-23.12.0-235-g923f216df"
+#define LEGION_VERSION "legion-23.12.0-235-g923f216df-dirty"
 
 #define DEBUG_LEGION
 

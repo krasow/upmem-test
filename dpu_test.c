@@ -8,9 +8,6 @@
 #include <perfcounter.h>
 #include <barrier.h>
 
-
-#include "realm.h"
-
 #include "common.h"
 
 __host dpu_arguments_t DPU_INPUT_ARGUMENTS;
