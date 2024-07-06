@@ -33,9 +33,9 @@ USE_UPMEM		?= 1		# Include UPMEM support (requries UPMEM SDK)
 # Put the binary file name here
 OUTFILE		?= upmem_test
 # List all the application source files here
-GEN_SRC		?= upmem_realm_test.cc	# .cc files
+GEN_SRC		?= host/upmem_realm_test.cc	# .cc files
 GEN_GPU_SRC	?= 
-GEN_UPMEM_SRC ?= dpu_test_realm.c  # .c files for UPMEM source (temp test)
+GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .c files for UPMEM source 
 
 
 # You can modify these variables, some will be appended to by the runtime makefile
@@ -43,7 +43,7 @@ INC_FLAGS	?=
 CC_FLAGS	?= 
 NVCC_FLAGS	?=
 HIPCC_FLAGS ?=
-UPMEMCC_FLAGS ?= -DUINT32
+UPMEMCC_FLAGS ?= -DUINT32 -g0 -g
 GASNET_FLAGS	?=
 LD_FLAGS	?=
 

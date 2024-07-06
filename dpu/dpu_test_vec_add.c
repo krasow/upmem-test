@@ -8,9 +8,18 @@
 #include <perfcounter.h>
 #include <barrier.h>
 
-#include "common.h"
+#include <realm/upmem/realm_c_upmem.h>
 
-__host dpu_arguments_t DPU_INPUT_ARGUMENTS;
+#define N 10
+
+
+typedef struct  {
+  Rect<2> bounds;
+  RegionInstance linear_instance;
+} DPUTaskArgs;
+
+
+__host DPUTaskArgs DPU_Task_Args; 
 
 int main_kernel1();
 
@@ -35,11 +44,16 @@ int main_kernel1() {
 #if PRINT
     printf("tasklet_id = %u\n", tasklet_id);
 #endif
-    if (tasklet_id == 0){ // Initialize once the cycle counter
-        mem_reset(); // Reset the heap
-    }
+
+
+    // if (tasklet_id == 0){ // Initialize once the cycle counter
+    //     mem_reset(); // Reset the heap
+    // }
+
+
     // Barrier
     barrier_wait(&my_barrier);
+
 
     uint32_t input_size_dpu_bytes = DPU_INPUT_ARGUMENTS.size; // Input size per DPU in bytes
     uint32_t input_size_dpu_bytes_transfer = DPU_INPUT_ARGUMENTS.transfer_size; // Transfer input size per DPU in bytes
@@ -52,6 +66,7 @@ int main_kernel1() {
     // Initialize a local cache to store the MRAM block
     T *cache_A = (T *) mem_alloc(BLOCK_SIZE);
     T *cache_B = (T *) mem_alloc(BLOCK_SIZE);
+
 
     for(unsigned int byte_index = base_tasklet; byte_index < input_size_dpu_bytes; byte_index += BLOCK_SIZE * NR_TASKLETS){
 
