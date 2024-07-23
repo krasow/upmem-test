@@ -12,11 +12,7 @@ int main(void) {
 }
 
 int main_kernel1() {
-
     unsigned int tasklet_id = me();
 
-    if (tasklet_id == 0){ // Initialize once the cycle counter
-        mem_reset(); // Reset the heap
-    }
     return 0;
 }

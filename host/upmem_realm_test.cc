@@ -24,6 +24,12 @@ typedef struct  {
   AffineAccessor<double, 2>  linear_accessor;
 } __attribute__((aligned(8))) __DPU_LAUNCH_TASK_ARGS;
 
+
+// typedef struct  {
+//   Upmem::Rect<2> bounds;
+//   Upmem::AffineAccessor<double, 2>  linear_accessor;
+// } __attribute__((aligned(8))) __DPU_LAUNCH_TASK_ARGS;
+
 typedef struct {
   Rect<2> bounds;
   RegionInstance linear_instance;
@@ -41,6 +47,8 @@ enum {
 static void dpu_launch_task(const void *data, size_t datalen,
                             const void *userdata, size_t userlen, Processor dpu) {
 
+  log_app.print() << "dpu launch task running on " << dpu;
+
   assert(datalen == sizeof(DPUTaskArgs));
   DPUTaskArgs task_args = *static_cast<const DPUTaskArgs *>(data);
 
@@ -48,14 +56,14 @@ static void dpu_launch_task(const void *data, size_t datalen,
 
   void *args[] = {&task_args.bounds, &linear_accessor};
 
+  dpu_set_t *stream = new dpu_set_t;
 
-  dpu_set_t stream; 
-  Upmem::LaunchKernel(DPU_LAUNCH_TASK_BINARY, args, "DPU_LAUNCH_TASK_ARGS", sizeof(__DPU_LAUNCH_TASK_ARGS),  &stream);
+  Upmem::LaunchKernel(DPU_LAUNCH_TASK_BINARY, args, "DPU_LAUNCH_TASK_ARGS", sizeof(__DPU_LAUNCH_TASK_ARGS),  stream);
 }
 
 void top_level_task(const void *args, size_t arglen, const void *userdata,
                     size_t userlen, Processor dpu) {
-  // log_app.print() << "top task running on " << dpu;
+  log_app.print() << "top task running on " << dpu;
 
   const size_t width = 1024, height = 1024;
   std::vector<size_t> field_sizes(1, sizeof(double));
@@ -90,11 +98,10 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     // for us asynchrnously.
 
     // Fill the linear array with zeros.
-    // srcs[0].set_fill<double>(0.0f);
-    // dsts[0].set_field(linear_instance, 0, field_sizes[0]);
-    // fill_done_event =
-    //     bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event);
-    
+    srcs[0].set_fill<double>(0.0f);
+    dsts[0].set_field(linear_instance, 0, field_sizes[0]);
+    fill_done_event =
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event);
   }
 
 
@@ -108,6 +115,10 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     dpu_task_done_event =
         dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), fill_done_event);
   }
+  printf("hello we are here\n");
+
+  Runtime::get_runtime().shutdown(dpu_task_done_event);
+
 }
 
 void check_task(const void *args, size_t arglen, const void *userdata,
@@ -130,10 +141,10 @@ int main(int argc, char **argv) {
       CodeDescriptor(dpu_launch_task), ProfilingRequestSet(), 0, 0)
       .wait();
 
-  Processor::register_task_by_kind(Processor::LOC_PROC, false /*!global*/,
-                                   CHECK_TASK, CodeDescriptor(check_task),
-                                   ProfilingRequestSet(), 0, 0)
-      .wait();
+  // Processor::register_task_by_kind(Processor::LOC_PROC, false /*!global*/,
+  //                                  CHECK_TASK, CodeDescriptor(check_task),
+  //                                  ProfilingRequestSet(), 0, 0)
+  //     .wait();
 
   Processor p = Machine::ProcessorQuery(Machine::get_machine())
                     .only_kind(Processor::DPU_PROC)

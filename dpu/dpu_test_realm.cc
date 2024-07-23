@@ -18,7 +18,6 @@ typedef struct {
 } __attribute__((aligned(8))) __DPU_LAUNCH_TASK_ARGS;
 
 
-// I HAVE NO FUCKING CLUE WHY GLOBAL HOST DEFINES DON'T WORK
 // __host __DPU_LAUNCH_TASK_ARGS DPU_LAUNCH_TASK_ARGS;  
 
 int main_kernel1();
@@ -36,8 +35,12 @@ int main_kernel1() {
 
     __DPU_LAUNCH_TASK_ARGS *DPU_LAUNCH_TASK_ARGS = (__DPU_LAUNCH_TASK_ARGS *)mem_alloc(sizeof(__DPU_LAUNCH_TASK_ARGS));
 
-    mram_read((__mram_ptr void const*)(DPU_MRAM_HEAP_POINTER), (void*)DPU_LAUNCH_TASK_ARGS, sizeof(__DPU_LAUNCH_TASK_ARGS));
+    // mram_read((__mram_ptr void const*)(DPU_MRAM_HEAP_POINTER), (void*)DPU_LAUNCH_TASK_ARGS, sizeof(__DPU_LAUNCH_TASK_ARGS));
     
-    double value = DPU_LAUNCH_TASK_ARGS->linear_accessor[Point<2>(0, 0)];
-    return (int) value;
+    // double value = DPU_LAUNCH_TASK_ARGS->linear_accessor[Point<2>(0, 0)];
+
+    // return (int) value;
+
+
+    return 0;
 }
