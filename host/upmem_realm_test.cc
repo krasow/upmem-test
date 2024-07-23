@@ -114,11 +114,9 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     args.linear_instance = linear_instance;
     dpu_task_done_event =
         dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), fill_done_event);
-  }
-  printf("hello we are here\n");
+  };
 
   Runtime::get_runtime().shutdown(dpu_task_done_event);
-
 }
 
 void check_task(const void *args, size_t arglen, const void *userdata,
