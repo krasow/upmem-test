@@ -18,17 +18,18 @@ using namespace Realm;
 
 Logger log_app("app");
 
-
-typedef struct  {
+typedef struct {
   Rect<2> bounds;
   AffineAccessor<double, 2>  linear_accessor;
-} __attribute__((aligned(8))) __DPU_LAUNCH_TASK_ARGS;
+  // padding of multiple of 8 bytes
+  PADDING(8);
+} __attribute__((aligned(8))) __DEVICE_DPU_LAUNCH_ARGS;
 
 
 // typedef struct  {
 //   Upmem::Rect<2> bounds;
 //   Upmem::AffineAccessor<double, 2>  linear_accessor;
-// } __attribute__((aligned(8))) __DPU_LAUNCH_TASK_ARGS;
+// } __attribute__((aligned(8))) __DEVICE_DPU_LAUNCH_ARGS;
 
 typedef struct {
   Rect<2> bounds;
@@ -54,11 +55,13 @@ static void dpu_launch_task(const void *data, size_t datalen,
 
   AffineAccessor<double, 2> linear_accessor(task_args.linear_instance, 0);
 
-  void *args[] = {&task_args.bounds, &linear_accessor};
-
-  dpu_set_t *stream = new dpu_set_t;
-
-  Upmem::LaunchKernel(DPU_LAUNCH_TASK_BINARY, args, "DPU_LAUNCH_TASK_ARGS", sizeof(__DPU_LAUNCH_TASK_ARGS),  stream);
+  {
+    __DEVICE_DPU_LAUNCH_ARGS args;
+    args.bounds = task_args.bounds;
+    args.linear_accessor = linear_accessor;
+    dpu_set_t *stream = new dpu_set_t;
+    Upmem::LaunchKernel(DPU_LAUNCH_TASK_BINARY, (void**)&args, "ARGS", sizeof(__DEVICE_DPU_LAUNCH_ARGS),  stream);
+  }
 }
 
 void top_level_task(const void *args, size_t arglen, const void *userdata,
@@ -98,7 +101,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     // for us asynchrnously.
 
     // Fill the linear array with zeros.
-    srcs[0].set_fill<double>(0.0f);
+    srcs[0].set_fill<double>(5.0f);
     dsts[0].set_field(linear_instance, 0, field_sizes[0]);
     fill_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event);

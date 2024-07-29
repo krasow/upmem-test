@@ -35,7 +35,7 @@ OUTFILE		?= upmem_test
 # List all the application source files here
 GEN_SRC		?= host/upmem_realm_test.cc	# .cc files
 GEN_GPU_SRC	?= 
-GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .c files for UPMEM source 
+GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .cc files for UPMEM source 
 
 
 # You can modify these variables, some will be appended to by the runtime makefile
