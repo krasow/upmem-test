@@ -4,6 +4,7 @@
 #include <defs.h>
 #include <mram.h>
 #include <alloc.h>
+#include <stdio.h>
 
 int main_kernel1();
 
@@ -13,6 +14,5 @@ int main(void) {
 
 int main_kernel1() {
     unsigned int tasklet_id = me();
-
     return 0;
 }

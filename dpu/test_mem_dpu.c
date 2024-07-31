@@ -29,7 +29,7 @@ int main(void) {
     for(int i = 1; i < 10; i++) {
         something = mem_alloc(i * 16); // WRAM heap
 
-        ((double*)something)[i] = 5.0000; // allocate on write? set value to allocation
+        ((volatile double*)something)[i] = 5.0000; // allocate on write? set value to allocation
 
         // read from WRAM and write to MRAM
         mram_write((const void *)(something),

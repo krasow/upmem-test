@@ -40,7 +40,7 @@ GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .cc files for UPMEM source
 
 # You can modify these variables, some will be appended to by the runtime makefile
 INC_FLAGS	?=
-CC_FLAGS	?= 
+CC_FLAGS	?= -DPRINT_UPMEM 
 NVCC_FLAGS	?=
 HIPCC_FLAGS ?=
 UPMEMCC_FLAGS ?= -DUINT32 -g0 -g
