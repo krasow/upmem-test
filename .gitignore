@@ -3,3 +3,4 @@ upmem_test
 *.out
 *.a
 *.so
+*.png

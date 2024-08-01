@@ -37,39 +37,35 @@ BARRIER_INIT(my_barrier, NR_TASKLETS);
 
 int (*kernels[nr_kernels])(void) = {main_kernel1};
 
-int main(void) { 
+int main(void) {
     return kernels[args->kernel](); 
 }
 
 int main_kernel1() {
     unsigned int tasklet_id = me();
+    if (tasklet_id == 0) {
+        printf("running with %d Tasklets\n", NR_TASKLETS);
+    }
 
-    unsigned int i, j;
     unsigned int row, column;
+    row = 2048;
+    column = 2048;
 
-    row = 500;
-    column = 500;
-
-    for (i = 0; i < row; i++) {
-        for (j = 0; j < column; j++) {
-            ok = args->linear_accessor[Point<2>(i, j)];
+    // tasklets need to be a multiple of row
+    for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
+        for(unsigned int idy = 0; idy < column; idy++){
+            ok = args->linear_accessor[Point<2>(idx, idy)];
             assert(ok == 5.0000);
         }
     }  
 
-    printf("ok is %1.3f at (%d, %d)\n", ok, row, column);
-
-
-    for (i = 0; i <= row; i++) {
-        for (j = 0; j <= column; j++) {
-            args->linear_accessor.write(Point<2>(i, j), 3.32);
-            ok = args->linear_accessor[Point<2>(i, j)];
+    for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
+        for(unsigned int idy = 0; idy < column; idy++){
+            args->linear_accessor.write(Point<2>(idx, idy), 3.32);
+            ok = args->linear_accessor[Point<2>(idx, idy)];
             assert(ok == 3.32);
         }
     }  
-
-    ok = args->linear_accessor[Point<2>(row, column)];
-    printf("ok is %1.3f at (%d, %d) after write\n", ok, row, column);
 
     return 0;
 }
