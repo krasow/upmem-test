@@ -18,49 +18,57 @@ using namespace Realm;
 
 Logger log_app("app");
 
-typedef struct {
-  Rect<2> bounds;
-  AffineAccessor<double, 2>  linear_accessor;
-  // padding of multiple of 8 bytes
-  PADDING(8);
-} __attribute__((aligned(8))) __DEVICE_DPU_LAUNCH_ARGS;
-
-
-// typedef struct  {
-//   Upmem::Rect<2> bounds;
-//   Upmem::AffineAccessor<double, 2>  linear_accessor;
-// } __attribute__((aligned(8))) __DEVICE_DPU_LAUNCH_ARGS;
-
-typedef struct {
-  Rect<2> bounds;
-  RegionInstance linear_instance;
-} __attribute__((aligned(8))) DPUTaskArgs;
-
-
+// for realm 
 enum {
   TOP_LEVEL_TASK = Processor::TASK_ID_FIRST_AVAILABLE + 0,
   DPU_LAUNCH_TASK,
   CHECK_TASK
 };
 
-#define  DPU_LAUNCH_TASK_BINARY  "dpu/dpu_test_realm.up.o"
+
+typedef struct {
+  Rect<2> bounds;
+  RegionInstance linear_instance;
+  Upmem::Kernel kernel;
+} __attribute__((aligned(8))) DPU_TASK_ARGS;
+
+
+// for the device
+#define  DPU_LAUNCH_BINARY  "dpu/dpu_test_realm.up.o"
+
+typedef enum {
+  test,
+  nr_kernels = 1,
+} DPU_LAUNCH_KERNELS;
+
+typedef struct {
+  Rect<2> bounds;
+  AffineAccessor<double, 2>  linear_accessor;
+  // which kernel to launch
+  DPU_LAUNCH_KERNELS kernel;
+  // padding of multiple of 8 bytes
+  PADDING(8);
+} __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
+
+
 
 static void dpu_launch_task(const void *data, size_t datalen,
                             const void *userdata, size_t userlen, Processor dpu) {
 
   log_app.print() << "dpu launch task running on " << dpu;
 
-  assert(datalen == sizeof(DPUTaskArgs));
-  DPUTaskArgs task_args = *static_cast<const DPUTaskArgs *>(data);
+  assert(datalen == sizeof(DPU_TASK_ARGS));
+  DPU_TASK_ARGS task_args = *static_cast<const DPU_TASK_ARGS *>(data);
 
   AffineAccessor<double, 2> linear_accessor(task_args.linear_instance, 0);
 
   {
-    __DEVICE_DPU_LAUNCH_ARGS args;
+    DPU_LAUNCH_ARGS args;
     args.bounds = task_args.bounds;
     args.linear_accessor = linear_accessor;
-    dpu_set_t *stream = new dpu_set_t;
-    Upmem::LaunchKernel(DPU_LAUNCH_TASK_BINARY, (void**)&args, "ARGS", sizeof(__DEVICE_DPU_LAUNCH_ARGS),  stream);
+    args.kernel = test;
+    // launch specific upmem kernel
+    task_args.kernel.launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
   }
 }
 
@@ -90,6 +98,13 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
                     size_t userlen, Processor dpu) {
   log_app.print() << "top task running on " << dpu;
 
+  // create a stream (aka dpu_set_t)
+  dpu_set_t *stream = new dpu_set_t;
+  // must associate a kernel with a stream
+  Upmem::Kernel kern = Upmem::Kernel(DPU_LAUNCH_BINARY, stream);
+  // the binary needs to be loaded before any memory operations
+  kern.load();
+
   const size_t width = 2048, height = 2048;
   std::vector<size_t> field_sizes(1, sizeof(double));
 
@@ -113,14 +128,6 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   Event fill_done_event = Event::NO_EVENT;
   {
     std::vector<CopySrcDstField> srcs(1), dsts(1);
-    // Realm does not currently support non-affine fill operations, so fill the linear
-    // array with the value we want and copy the linear array to the cuda array instance,
-    // making sure to chain the events as we go along
-    // While we could use cuda APIs to achieve the same result (using cudaMemcpy3D or
-    // cudaMemcpyToArray), we would need to synchronize the instance creation at this
-    // point for the linear array, or allocate our own gpu-accessible staging buffer, or
-    // have cuda do a pageable memcpy to the array.  Instead, we just let realm handle it
-    // for us asynchrnously.
 
     // Fill the linear array with zeros.
     srcs[0].set_fill<double>(5.0f);
@@ -134,14 +141,13 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
   Event dpu_task_done_event = Event::NO_EVENT;
   {
-    DPUTaskArgs args;
+    DPU_TASK_ARGS args;
     args.bounds = bounds;
     args.linear_instance = linear_instance;
+    args.kernel = kern;
     dpu_task_done_event =
         dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), fill_done_event);
   };
-
-
 
   Processor check_processor = Machine::ProcessorQuery(Machine::get_machine())
                                   .only_kind(Processor::LOC_PROC)
