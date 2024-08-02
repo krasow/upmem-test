@@ -8,8 +8,6 @@ extern "C" {
 
 #include <realm/upmem/realm_c_upmem.h>
 
-volatile double ok = 0.0;
-
 typedef enum DPU_LAUNCH_KERNELS{
   test,
   nr_kernels = 1
@@ -51,19 +49,21 @@ int main_kernel1() {
     row = 2048;
     column = 2048;
 
+    double res = 0.0;
+
     // tasklets need to be a multiple of row
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
-            ok = args->linear_accessor[Point<2>(idx, idy)];
-            assert(ok == 5.0000);
+            res = args->linear_accessor[Point<2>(idx, idy)];
+            assert(res == 5.0000);
         }
     }  
 
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
             args->linear_accessor.write(Point<2>(idx, idy), 3.32);
-            ok = args->linear_accessor[Point<2>(idx, idy)];
-            assert(ok == 3.32);
+            res = args->linear_accessor[Point<2>(idx, idy)];
+            assert(res == 3.32);
         }
     }  
 

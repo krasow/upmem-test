@@ -176,7 +176,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   {
     std::vector<CopySrcDstField> srcs(1), dsts(1);
     // Initialize the host memory with some data
-    srcs[0].set_fill<double>(14.0f);
+    srcs[0].set_fill<double>(1.0f);
     dsts[0].set_field(check_instance, 0, field_sizes[0]);
     copy_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), check_instance_ready_event);
