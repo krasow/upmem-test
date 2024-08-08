@@ -15,7 +15,7 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 typedef struct __DPU_LAUNCH_ARGS {
     Rect<2> bounds;
-    AffineAccessor<double, 2> linear_accessor;
+    AffineAccessor<int, 2> linear_accessor;
     DPU_LAUNCH_KERNELS kernel;
     PADDING(8);
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
@@ -46,24 +46,26 @@ int main_kernel1() {
     }
 
     unsigned int row, column;
-    row = 2048;
-    column = 2048;
+    row = 256;
+    column = 256;
 
-    double res = 0.0;
+    int res = 0;
 
     // tasklets need to be a multiple of row
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
             res = args->linear_accessor[Point<2>(idx, idy)];
-            assert(res == 5.0000);
+            assert(res == 5);
         }
     }  
 
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
-            args->linear_accessor.write(Point<2>(idx, idy), 3.32);
-            res = args->linear_accessor[Point<2>(idx, idy)];
-            assert(res == 3.32);
+            // interchanging idy and idx will result in wrong results
+            // TODO: can fix by adding reader locks
+            args->linear_accessor.write(Point<2>(idy, idx), idx*column + idy);
+            res = args->linear_accessor[Point<2>(idy, idx)];
+            assert(res == (idx*column + idy));
         }
     }  
 

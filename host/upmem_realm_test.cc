@@ -43,7 +43,7 @@ typedef enum {
 
 typedef struct {
   Rect<2> bounds;
-  AffineAccessor<double, 2>  linear_accessor;
+  AffineAccessor<int, 2>  linear_accessor;
   // which kernel to launch
   DPU_LAUNCH_KERNELS kernel;
   // padding of multiple of 8 bytes
@@ -60,7 +60,7 @@ static void dpu_launch_task(const void *data, size_t datalen,
   assert(datalen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *static_cast<const DPU_TASK_ARGS *>(data);
 
-  AffineAccessor<double, 2> linear_accessor(task_args.linear_instance, 0);
+  AffineAccessor<int, 2> linear_accessor(task_args.linear_instance, 0);
 
   {
     DPU_LAUNCH_ARGS args;
@@ -85,10 +85,10 @@ static void check_task(const void *data, size_t datalen, const void *userdata,
   assert(file != NULL && "error open file");
   const CheckTaskArgs &task_args = *static_cast<const CheckTaskArgs *>(data);
   const Rect<2> bounds = task_args.host_linear_instance.get_indexspace<2>().bounds;
-  AffineAccessor<double, 2> linear_accessor(task_args.host_linear_instance, 0);
+  AffineAccessor<int, 2> linear_accessor(task_args.host_linear_instance, 0);
   for(PointInRectIterator<2> pir(bounds); pir.valid; pir.step()) {
-    double value = linear_accessor[pir.p];
-    fwrite(&value, sizeof(double), 1, file);
+    int value = linear_accessor[pir.p];
+    fwrite(&value, sizeof(int), 1, file);
   }
   fclose(file);
 }
@@ -105,14 +105,14 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   // the binary needs to be loaded before any memory operations
   kern.load();
 
-  const size_t width = 2048, height = 2048;
-  std::vector<size_t> field_sizes(1, sizeof(double));
+  const size_t width = 256, height = 256;
+  std::vector<size_t> field_sizes(1, sizeof(int));
 
   Rect<2> bounds(Point<2>(0, 0), Point<2>(width - 1, height - 1));
 
   // ==== Allocating DPU memory with Realm ====
   Memory dpu_mem = Machine::MemoryQuery(Machine::get_machine())
-                       .has_capacity(bounds.volume() /* index space */ * 1 /* number of fields */ * sizeof(double) /* type of field */)
+                       .has_capacity(bounds.volume() /* index space */ * 1 /* number of fields */ * sizeof(int) /* type of field */)
                        .best_affinity_to(dpu)
                        .first();
 
@@ -130,7 +130,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     std::vector<CopySrcDstField> srcs(1), dsts(1);
 
     // Fill the linear array with zeros.
-    srcs[0].set_fill<double>(5.0f);
+    srcs[0].set_fill<int>(5);
     dsts[0].set_field(linear_instance, 0, field_sizes[0]);
     fill_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event);
@@ -157,7 +157,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
          "Failed to find suitable CPU processor to check results!");
 
   Memory cpu_mem = Machine::MemoryQuery(Machine::get_machine())
-                       .has_capacity(width * height * sizeof(double))
+                       .has_capacity(width * height * sizeof(int))
                        .has_affinity_to(check_processor)
                       //  .has_affinity_to(dpu)
                        .first();
@@ -176,7 +176,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   {
     std::vector<CopySrcDstField> srcs(1), dsts(1);
     // Initialize the host memory with some data
-    srcs[0].set_fill<double>(1.0f);
+    srcs[0].set_fill<int>(1);
     dsts[0].set_field(check_instance, 0, field_sizes[0]);
     copy_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), check_instance_ready_event);
