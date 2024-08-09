@@ -15,13 +15,14 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 typedef struct __DPU_LAUNCH_ARGS {
     Rect<2> bounds;
-    AffineAccessor<int, 2> linear_accessor;
+    AffineAccessor<int, 2> linear_accessor1;
+    AffineAccessor<int, 2> linear_accessor2;
     DPU_LAUNCH_KERNELS kernel;
     PADDING(8);
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
 
 typedef struct DPU_LAUNCH_ARGS {
-    char paddd[64];
+    char paddd[128];
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
 
 __host DPU_LAUNCH_ARGS ARGS;  
@@ -54,19 +55,41 @@ int main_kernel1() {
     // tasklets need to be a multiple of row
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
-            res = args->linear_accessor[Point<2>(idx, idy)];
-            assert(res == 5);
+            res = args->linear_accessor1[Point<2>(idx, idy)];
+            assert(res == 1);
         }
     }  
-
     for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
         for(unsigned int idy = 0; idy < column; idy++){
-            // interchanging idy and idx will result in wrong results
-            // TODO: can fix by adding reader locks
-            args->linear_accessor.write(Point<2>(idy, idx), idx*column + idy);
-            res = args->linear_accessor[Point<2>(idy, idx)];
-            assert(res == (idx*column + idy));
+            res = args->linear_accessor2[Point<2>(idx, idy)];
+            assert(res == 1);
         }
+    }
+
+    unsigned total_size = row * column;
+
+
+    for(unsigned int index = tasklet_id; index < total_size; index += NR_TASKLETS){
+
+        unsigned int idx = index/column;
+        unsigned int idy = index%column;
+
+        unsigned int sum = 0;
+
+        for(unsigned int k = 0; k<column; k++){
+            unsigned int a = args->linear_accessor1[Point<2>(idx, k)];
+            unsigned int b = args->linear_accessor2[Point<2>(k, idy)];
+            sum += a*b;
+        }
+        args->linear_accessor2.write(Point<2>(idx, idy), sum);
+
+        // for(unsigned int idy = 0; idy < column; idy++){
+        //     // interchanging idy and idx will result in wrong results
+        //     // TODO: can fix by adding reader locks
+        //     args->linear_accessor2.write(Point<2>(idy, idx), idx*column + idy);
+        //     res = args->linear_accessor[Point<2>(idy, idx)];
+        //     assert(res == (idx*column + idy));
+        // }
     }  
 
     return 0;

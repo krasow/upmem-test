@@ -16,6 +16,10 @@
 
 using namespace Realm;
 
+
+#define WIDTH 256
+#define HEIGHT 256
+
 Logger log_app("app");
 
 // for realm 
@@ -28,7 +32,8 @@ enum {
 
 typedef struct {
   Rect<2> bounds;
-  RegionInstance linear_instance;
+  RegionInstance linear_instance1;
+  RegionInstance linear_instance2;
   Upmem::Kernel kernel;
 } __attribute__((aligned(8))) DPU_TASK_ARGS;
 
@@ -43,7 +48,8 @@ typedef enum {
 
 typedef struct {
   Rect<2> bounds;
-  AffineAccessor<int, 2>  linear_accessor;
+  AffineAccessor<int, 2>  linear_accessor1;
+  AffineAccessor<int, 2>  linear_accessor2;
   // which kernel to launch
   DPU_LAUNCH_KERNELS kernel;
   // padding of multiple of 8 bytes
@@ -60,12 +66,14 @@ static void dpu_launch_task(const void *data, size_t datalen,
   assert(datalen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *static_cast<const DPU_TASK_ARGS *>(data);
 
-  AffineAccessor<int, 2> linear_accessor(task_args.linear_instance, 0);
+  AffineAccessor<int, 2> linear_accessor1(task_args.linear_instance1, 0);
+  AffineAccessor<int, 2> linear_accessor2(task_args.linear_instance2, 0);
 
   {
     DPU_LAUNCH_ARGS args;
     args.bounds = task_args.bounds;
-    args.linear_accessor = linear_accessor;
+    args.linear_accessor1 = linear_accessor1;
+    args.linear_accessor2 = linear_accessor2;
     args.kernel = test;
     // launch specific upmem kernel
     task_args.kernel.launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
@@ -81,14 +89,20 @@ static void check_task(const void *data, size_t datalen, const void *userdata,
                        size_t userlen, Processor p)
 {
   assert(datalen == sizeof(CheckTaskArgs));
-  FILE *file = fopen("array.bin", "wb");
+  FILE *file = fopen("array.out", "w");
   assert(file != NULL && "error open file");
   const CheckTaskArgs &task_args = *static_cast<const CheckTaskArgs *>(data);
   const Rect<2> bounds = task_args.host_linear_instance.get_indexspace<2>().bounds;
   AffineAccessor<int, 2> linear_accessor(task_args.host_linear_instance, 0);
+  unsigned int cnter = 0;
   for(PointInRectIterator<2> pir(bounds); pir.valid; pir.step()) {
     int value = linear_accessor[pir.p];
-    fwrite(&value, sizeof(int), 1, file);
+    if(cnter%WIDTH == 0){
+      fprintf(file, "\n");
+    }
+    fprintf(file, "%d ", value);
+    // fwrite(&value, sizeof(int), 1, file);
+    cnter++;
   }
   fclose(file);
 }
@@ -105,36 +119,59 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   // the binary needs to be loaded before any memory operations
   kern.load();
 
-  const size_t width = 256, height = 256;
+  const size_t width = WIDTH, height = HEIGHT;
   std::vector<size_t> field_sizes(1, sizeof(int));
 
   Rect<2> bounds(Point<2>(0, 0), Point<2>(width - 1, height - 1));
+  // Rect<2> bound2(Point<2>(0, 0), Point<2>(width - 1, height - 1));
 
   // ==== Allocating DPU memory with Realm ====
-  Memory dpu_mem = Machine::MemoryQuery(Machine::get_machine())
+  Memory dpu_mem1 = Machine::MemoryQuery(Machine::get_machine())
                        .has_capacity(bounds.volume() /* index space */ * 1 /* number of fields */ * sizeof(int) /* type of field */)
                        .best_affinity_to(dpu)
                        .first();
 
-  assert((dpu_mem != Memory::NO_MEMORY) && "Failed to find suitable DPU memory to use!");
+  assert((dpu_mem1 != Memory::NO_MEMORY) && "Failed to find suitable DPU memory to use for bound 1!");
+  Memory dpu_mem2 = Machine::MemoryQuery(Machine::get_machine())
+                       .has_capacity(bounds.volume() /* index space */ * 1 /* number of fields */ * sizeof(int) /* type of field */)
+                       .best_affinity_to(dpu)
+                       .first();
+
+  assert((dpu_mem2 != Memory::NO_MEMORY) && "Failed to find suitable DPU memory to use for bound 2!");
 
   // Now create a 2D instance like we normally would
-  RegionInstance linear_instance = RegionInstance::NO_INST;
-  Event linear_instance_ready_event =
-      RegionInstance::create_instance(linear_instance, dpu_mem, bounds, field_sizes,
+  RegionInstance linear_instance1 = RegionInstance::NO_INST;
+  Event linear_instance_ready_event1 =
+      RegionInstance::create_instance(linear_instance1, dpu_mem1, bounds, field_sizes,
+                                      /*SOA*/ 1, ProfilingRequestSet());
+
+  RegionInstance linear_instance2 = RegionInstance::NO_INST;
+  Event linear_instance_ready_event2 =
+      RegionInstance::create_instance(linear_instance2, dpu_mem2, bounds, field_sizes,
                                       /*SOA*/ 1, ProfilingRequestSet());
 
   // ==== Data Movement ====
-  Event fill_done_event = Event::NO_EVENT;
+  Event fill_done_event1 = Event::NO_EVENT;
   {
     std::vector<CopySrcDstField> srcs(1), dsts(1);
 
     // Fill the linear array with zeros.
-    srcs[0].set_fill<int>(5);
-    dsts[0].set_field(linear_instance, 0, field_sizes[0]);
-    fill_done_event =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event);
+    srcs[0].set_fill<int>(1);
+    dsts[0].set_field(linear_instance1, 0, field_sizes[0]);
+    fill_done_event1 =
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event1);
   }
+  Event fill_done_event2 = Event::NO_EVENT;
+  {
+    std::vector<CopySrcDstField> srcs(1), dsts(1);
+
+    // Fill the linear array with zeros.
+    srcs[0].set_fill<int>(1);
+    dsts[0].set_field(linear_instance2, 0, field_sizes[0]);
+    fill_done_event2 =
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), linear_instance_ready_event2);
+  }
+  Event fill_done_event = Event::merge_events(fill_done_event1, fill_done_event2);
 
 
  // ==== Task Spawning ====
@@ -143,7 +180,8 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   {
     DPU_TASK_ARGS args;
     args.bounds = bounds;
-    args.linear_instance = linear_instance;
+    args.linear_instance1 = linear_instance1;
+    args.linear_instance2 = linear_instance2;
     args.kernel = kern;
     dpu_task_done_event =
         dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), fill_done_event);
@@ -181,7 +219,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     copy_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), check_instance_ready_event);
     // Overwrite the previous fill with the data from the array
-    srcs[0].set_field(linear_instance, 0, field_sizes[0]);
+    srcs[0].set_field(linear_instance2, 0, field_sizes[0]);
     dsts[0].set_field(check_instance, 0, field_sizes[0]);
     copy_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(),
