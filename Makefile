@@ -33,7 +33,8 @@ USE_UPMEM		?= 1		# Include UPMEM support (requries UPMEM SDK)
 # Put the binary file name here
 OUTFILE		?= upmem_test
 # List all the application source files here
-GEN_SRC		?= host/upmem_realm_test.cc	# .cc files
+# GEN_SRC		?= host/upmem_realm_test.cc	# .cc files
+GEN_SRC		?= host/upmem_legion_test.cc	# .cc files
 GEN_GPU_SRC	?= 
 GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .cc files for UPMEM source 
 
