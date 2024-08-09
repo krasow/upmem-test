@@ -17,6 +17,7 @@ typedef struct __DPU_LAUNCH_ARGS {
     Rect<2> bounds;
     AffineAccessor<int, 2> linear_accessor1;
     AffineAccessor<int, 2> linear_accessor2;
+    AffineAccessor<int, 2> linear_accessor3;
     DPU_LAUNCH_KERNELS kernel;
     PADDING(8);
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
@@ -47,8 +48,8 @@ int main_kernel1() {
     }
 
     unsigned int row, column;
-    row = 256;
-    column = 256;
+    row = 32;
+    column = 32;
 
     int res = 0;
 
@@ -81,7 +82,8 @@ int main_kernel1() {
             unsigned int b = args->linear_accessor2[Point<2>(k, idy)];
             sum += a*b;
         }
-        args->linear_accessor2.write(Point<2>(idx, idy), sum);
+        // sum+=32;
+        args->linear_accessor3.write(Point<2>(idx, idy), sum);
 
         // for(unsigned int idy = 0; idy < column; idy++){
         //     // interchanging idy and idx will result in wrong results
