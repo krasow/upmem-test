@@ -345,7 +345,6 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
       Event::merge_events(arrayA_fill_done, arrayB_fill_done, arrayC_fill_done);
 
   // ==== Task Spawning ====
-
   Event cpu_task_done_event = Event::NO_EVENT;
   {
     DPU_TASK_ARGS args;
@@ -354,7 +353,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     args.arrayB_instance = host_arrayB_instance;
     args.arrayC_instance = host_arrayC_instance;
     cpu_task_done_event =
-        cpu.spawn(CPU_LAUNCH_TASK, &args, sizeof(args), host_fill_done_event);
+        cpu.spawn(CPU_LAUNCH_TASK, &args, sizeof(args), fill_task_done_event);
   };
 
   Event dpu_task_done_event = Event::NO_EVENT;

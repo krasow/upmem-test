@@ -51,24 +51,7 @@ int main_kernel1() {
     row = 32;
     column = 32;
 
-    int res = 0;
-
-    // tasklets need to be a multiple of row
-    // for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
-    //     for(unsigned int idy = 0; idy < column; idy++){
-    //         res = args->arrayA_accessor[Point<2>(idx, idy)];
-    //         assert(res == 1);
-    //     }
-    // }  
-    // for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
-    //     for(unsigned int idy = 0; idy < column; idy++){
-    //         res = args->arrayB_accessor[Point<2>(idx, idy)];
-    //         assert(res == 1);
-    //     }
-    // }
-
     unsigned total_size = row * column;
-
 
     for(unsigned int index = tasklet_id; index < total_size; index += NR_TASKLETS){
 

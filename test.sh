@@ -1,5 +1,5 @@
 # make clean
-make -j 100
+nice make -j 100
 
 ./upmem_test -ll:num_dpus 1
 
