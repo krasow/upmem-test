@@ -23,6 +23,8 @@ def read_binary_file(file_path, rows, cols, dtype):
             datatype = np.float32
         case "int32":
             datatype = np.int32
+        case "uint32":
+            datatype = np.uint32
         case _:
             exit()
 

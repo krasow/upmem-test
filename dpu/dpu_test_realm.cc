@@ -15,9 +15,9 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 typedef struct __DPU_LAUNCH_ARGS {
     Rect<2> bounds;
-    AffineAccessor<int, 2> linear_accessor1;
-    AffineAccessor<int, 2> linear_accessor2;
-    AffineAccessor<int, 2> linear_accessor3;
+    AffineAccessor<int, 2> arrayA_accessor;
+    AffineAccessor<int, 2> arrayB_accessor;
+    AffineAccessor<int, 2> arrayC_accessor;
     DPU_LAUNCH_KERNELS kernel;
     PADDING(8);
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
@@ -54,18 +54,18 @@ int main_kernel1() {
     int res = 0;
 
     // tasklets need to be a multiple of row
-    for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
-        for(unsigned int idy = 0; idy < column; idy++){
-            res = args->linear_accessor1[Point<2>(idx, idy)];
-            assert(res == 1);
-        }
-    }  
-    for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
-        for(unsigned int idy = 0; idy < column; idy++){
-            res = args->linear_accessor2[Point<2>(idx, idy)];
-            assert(res == 1);
-        }
-    }
+    // for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
+    //     for(unsigned int idy = 0; idy < column; idy++){
+    //         res = args->arrayA_accessor[Point<2>(idx, idy)];
+    //         assert(res == 1);
+    //     }
+    // }  
+    // for(unsigned int idx = tasklet_id; idx < row; idx += NR_TASKLETS){
+    //     for(unsigned int idy = 0; idy < column; idy++){
+    //         res = args->arrayB_accessor[Point<2>(idx, idy)];
+    //         assert(res == 1);
+    //     }
+    // }
 
     unsigned total_size = row * column;
 
@@ -78,20 +78,11 @@ int main_kernel1() {
         unsigned int sum = 0;
 
         for(unsigned int k = 0; k<column; k++){
-            unsigned int a = args->linear_accessor1[Point<2>(idx, k)];
-            unsigned int b = args->linear_accessor2[Point<2>(k, idy)];
+            unsigned int a = args->arrayA_accessor[Point<2>(idx, k)];
+            unsigned int b = args->arrayB_accessor[Point<2>(k, idy)];
             sum += a*b;
         }
-        // sum+=32;
-        args->linear_accessor3.write(Point<2>(idx, idy), sum);
-
-        // for(unsigned int idy = 0; idy < column; idy++){
-        //     // interchanging idy and idx will result in wrong results
-        //     // TODO: can fix by adding reader locks
-        //     args->linear_accessor2.write(Point<2>(idy, idx), idx*column + idy);
-        //     res = args->linear_accessor[Point<2>(idy, idx)];
-        //     assert(res == (idx*column + idy));
-        // }
+        args->arrayC_accessor.write(Point<2>(idx, idy), sum);
     }  
 
     return 0;
