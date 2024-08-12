@@ -21,6 +21,14 @@
 #include <math.h>
 #include <limits>
 #include "legion.h"
+
+#include <realm/upmem/upmem_access.h>
+
+
+#if !defined(REALM_USE_UPMEM) 
+#error Realm not compiled with UPMEM enabled
+#endif // !defined(REALM_USE_UPMEM) 
+
 using namespace Legion;
 
 typedef FieldAccessor<READ_ONLY,double,1,coord_t,
@@ -34,6 +42,35 @@ enum TaskIDs {
   DAXPY_TASK_ID,
   CHECK_TASK_ID,
 };
+
+
+
+typedef enum {
+  test,
+  nr_kernels = 1,
+} DPU_LAUNCH_KERNELS;
+
+
+typedef struct {
+  Rect<1> rect;
+  AccessorRO acc_y;
+  AccessorRO acc_x;
+  AccessorWD acc_z;
+  double alpha;
+  DPU_LAUNCH_KERNELS kernel;
+  PADDING(8);
+} __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
+
+
+typedef struct {
+  double alpha;
+  Realm::Upmem::Kernel kernel;
+} DPU_TASK_ARGS;
+
+
+// for the device
+#define  DPU_LAUNCH_BINARY  "dpu/dpu_test_realm.up.o"
+
 
 enum FieldIDs {
   FID_X,
@@ -67,6 +104,14 @@ void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions,
                     Context ctx, Runtime *runtime)
 {
+  // create a stream (aka dpu_set_t)
+  dpu_set_t *stream = new dpu_set_t;
+  // must associate a kernel with a stream
+  Realm::Upmem::Kernel kern = Realm::Upmem::Kernel(DPU_LAUNCH_BINARY, stream);
+  // the binary needs to be loaded before any memory operations
+  kern.load();
+
+
   int num_elements = 1024; 
   int num_subregions = 4;
   int soa_flag = 0;
@@ -290,12 +335,16 @@ void top_level_task(const Task *task,
 
   const double alpha = drand48();
   double start_t = get_cur_time();
+
+  DPU_TASK_ARGS args;
+  args.alpha = alpha;
+  args.kernel = kern;
   // We launch the subtasks for performing the daxpy computation
   // in a similar way to the initialize field tasks.  Note we
   // again make use of two RegionRequirements which use a
   // partition as the upper bound for the privileges for the task.
   IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is,
-                TaskArgument(&alpha, sizeof(alpha)), arg_map);
+                TaskArgument(&args, sizeof(DPU_TASK_ARGS)), arg_map);
   daxpy_launcher.add_region_requirement(
       RegionRequirement(input_lp, 0/*projection ID*/,
                         READ_ONLY, EXCLUSIVE, input_lr));
@@ -369,8 +418,9 @@ void daxpy_task(const Task *task,
 {
   assert(regions.size() == 2);
   assert(task->regions.size() == 2);
-  assert(task->arglen == sizeof(double));
-  const double alpha = *((const double*)task->args);
+  assert(task->arglen == sizeof(DPU_TASK_ARGS));
+  DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS*)task->args);
+  const double alpha = task_args.alpha;
   const int point = task->index_point.point_data[0];
 
   const AccessorRO acc_y(regions[0], FID_Y);
@@ -382,8 +432,17 @@ void daxpy_task(const Task *task,
   printf("Running daxpy computation with alpha %.8g for point %d, xptr %p, y_ptr %p, z_ptr %p...\n", 
           alpha, point, 
           acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
-//   for (PointInRectIterator<1> pir(rect); pir(); pir++)
-//     acc_z[*pir] = alpha * acc_x[*pir] + acc_y[*pir];
+  {
+    DPU_LAUNCH_ARGS args;
+    args.rect = rect;
+    args.acc_y = acc_y;
+    args.acc_x = acc_x;
+    args.acc_z = acc_z;
+    args.alpha = alpha;
+    args.kernel = test;
+    // launch specific upmem kernel
+    task_args.kernel.launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+  }
 }
 
 void check_task(const Task *task,
@@ -431,7 +490,7 @@ int main(int argc, char **argv)
 
   {
     TaskVariantRegistrar registrar(TOP_LEVEL_TASK_ID, "top_level");
-    registrar.add_constraint(ProcessorConstraint(Processor::LOC_PROC));
+    registrar.add_constraint(ProcessorConstraint(Processor::DPU_PROC));
     Runtime::preregister_task_variant<top_level_task>(registrar, "top_level");
   }
 

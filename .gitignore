@@ -4,3 +4,4 @@ upmem_test
 *.a
 *.so
 *.png
+*.bin
