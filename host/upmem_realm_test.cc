@@ -203,6 +203,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   Memory cpu_mem = Machine::MemoryQuery(Machine::get_machine())
                        .has_capacity(4 * width * height * sizeof(int))
                        .has_affinity_to(cpu)
+                       .has_affinity_to(dpu)
                        .first();
 
   assert((cpu_mem != Memory::NO_MEMORY) &&
