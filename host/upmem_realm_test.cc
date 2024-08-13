@@ -225,40 +225,22 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
                                       field_sizes, 0, ProfilingRequestSet());
   
   // ==== Data Movement ====
-  Event host_arrayA_fill_done = Event::NO_EVENT;
+  Event host_fill_done_event = Event::NO_EVENT;
   {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
+    std::vector<CopySrcDstField> srcs(3), dsts(3);
 
     srcs[0].set_fill<int>(1);
     dsts[0].set_field(host_linear_instance, FID_A, field_sizes[FID_A]);
-    host_arrayA_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                                        host_linear_instance_ready);
 
-  }
-  Event host_arrayB_fill_done = Event::NO_EVENT;
-  {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
+    srcs[1].set_fill<int>(1);
+    dsts[1].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
 
-    // Fill the linear array with ones.
-    srcs[0].set_fill<int>(1);
-    dsts[0].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
-    host_arrayB_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
+    srcs[2].set_fill<int>(1);
+    dsts[2].set_field(host_linear_instance, FID_C, field_sizes[FID_C]);
+
+    host_fill_done_event = bounds.copy(srcs, dsts, ProfilingRequestSet(),
                                         host_linear_instance_ready);
   }
-
-  Event host_arrayC_fill_done = Event::NO_EVENT;
-  {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
-
-    // Fill the linear array with ones.
-    srcs[0].set_fill<int>(1);
-    dsts[0].set_field(host_linear_instance, FID_C, field_sizes[FID_C]);
-    host_arrayC_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                                        host_linear_instance_ready);
-  }
-
-  Event host_fill_done_event = Event::merge_events(
-      host_arrayA_fill_done, host_arrayB_fill_done, host_arrayC_fill_done);
 
 
   Event fill_task_done_event = Event::NO_EVENT;
@@ -286,53 +268,39 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
       device_linear_instance, dpu_mem, bounds, field_sizes, 0, ProfilingRequestSet());
 
   // ==== Data Movement ====
-  Event arrayA_fill_done = Event::NO_EVENT;
+  Event device_init_field_event = Event::NO_EVENT;
   {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
+    std::vector<CopySrcDstField> srcs(3), dsts(3);
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
     dsts[0].set_field(device_linear_instance, FID_A, field_sizes[FID_A]);
-    arrayA_fill_done =
+
+    srcs[1].set_fill<int>(1);
+    dsts[1].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
+
+    srcs[2].set_fill<int>(1);
+    dsts[2].set_field(device_linear_instance, FID_C, field_sizes[FID_C]);
+    device_init_field_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
+  }
+
+  Event device_copy_field_event = Event::NO_EVENT;
+  {
+    std::vector<CopySrcDstField> srcs(2), dsts(2);
 
     // Overwrite the previous fill with the data from the array
     srcs[0].set_field(host_linear_instance, FID_A, field_sizes[FID_A]);
     dsts[0].set_field(device_linear_instance, FID_A, field_sizes[FID_A]);
-    arrayA_fill_done =
+
+    srcs[1].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
+    dsts[1].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
+    
+    device_copy_field_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                    Event::merge_events(arrayA_fill_done, fill_task_done_event));
-  }
-  Event arrayB_fill_done = Event::NO_EVENT;
-  {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
-
-    // Fill the linear array with ones.
-    srcs[0].set_fill<int>(1);
-    dsts[0].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
-    arrayB_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
-
-    // Overwrite the previous fill with the data from the array
-    srcs[0].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
-    dsts[0].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
-    arrayB_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                    Event::merge_events(arrayB_fill_done, fill_task_done_event));
+                    Event::merge_events(device_init_field_event, fill_task_done_event));
   }
 
-  Event arrayC_fill_done = Event::NO_EVENT;
-  {
-    std::vector<CopySrcDstField> srcs(1), dsts(1);
-
-    // Fill the linear array with ones.
-    srcs[0].set_fill<int>(1);
-    dsts[0].set_field(device_linear_instance, FID_C, field_sizes[FID_C]);
-    arrayC_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
-  }
-  Event device_fill_done_event =
-      Event::merge_events(arrayA_fill_done, arrayB_fill_done, arrayC_fill_done);
 
   // ==== Task Spawning ====
   Event cpu_task_done_event = Event::NO_EVENT;
@@ -351,7 +319,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     args.linear_instance = device_linear_instance;
     args.kernel = kern;
     dpu_task_done_event =
-        dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), device_fill_done_event);
+        dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), device_copy_field_event);
   };
 
   std::vector<size_t> check_field_size(1, sizeof(int));
