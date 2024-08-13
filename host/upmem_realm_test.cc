@@ -29,11 +29,15 @@ enum {
   CHECK_TASK
 };
 
+enum FieldIDs {
+  FID_A = 101,
+  FID_B = 102,
+  FID_C = 103,
+};
+
 typedef struct {
   Rect<2> bounds;
-  RegionInstance arrayA_instance;
-  RegionInstance arrayB_instance;
-  RegionInstance arrayC_instance;
+  RegionInstance linear_instance;
   Upmem::Kernel kernel;
 } __attribute__((aligned(8))) DPU_TASK_ARGS;
 
@@ -65,9 +69,9 @@ static void dpu_launch_task(const void *data, size_t datalen,
   assert(datalen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *static_cast<const DPU_TASK_ARGS *>(data);
 
-  AffineAccessor<int, 2> arrayA_accessor(task_args.arrayA_instance, 0);
-  AffineAccessor<int, 2> arrayB_accessor(task_args.arrayB_instance, 0);
-  AffineAccessor<int, 2> arrayC_accessor(task_args.arrayC_instance, 0);
+  AffineAccessor<int, 2> arrayA_accessor(task_args.linear_instance, FID_A);
+  AffineAccessor<int, 2> arrayB_accessor(task_args.linear_instance, FID_B);
+  AffineAccessor<int, 2> arrayC_accessor(task_args.linear_instance, FID_C);
 
   {
     DPU_LAUNCH_ARGS args;
@@ -90,9 +94,9 @@ static void cpu_launch_task(const void *data, size_t datalen,
   assert(datalen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *static_cast<const DPU_TASK_ARGS *>(data);
 
-  AffineAccessor<int, 2> arrayA_accessor(task_args.arrayA_instance, 0);
-  AffineAccessor<int, 2> arrayB_accessor(task_args.arrayB_instance, 0);
-  AffineAccessor<int, 2> arrayC_accessor(task_args.arrayC_instance, 0);
+  AffineAccessor<int, 2> arrayA_accessor(task_args.linear_instance, FID_A);
+  AffineAccessor<int, 2> arrayB_accessor(task_args.linear_instance, FID_B);
+  AffineAccessor<int, 2> arrayC_accessor(task_args.linear_instance, FID_C);
 
   for (uint32_t idx = 0; idx < HEIGHT; idx++) {
     for (uint32_t idy = 0; idy < WIDTH; idy++) {
@@ -110,8 +114,7 @@ static void cpu_launch_task(const void *data, size_t datalen,
 
 
 struct FillTaskArgs {
-  RegionInstance arrayA_instance;
-  RegionInstance arrayB_instance;
+  RegionInstance linear_instance;
 };
 
 static void fill_task(const void *data, size_t datalen, const void *userdata,
@@ -119,11 +122,11 @@ static void fill_task(const void *data, size_t datalen, const void *userdata,
   assert(datalen == sizeof(FillTaskArgs));
   const FillTaskArgs &task_args = *static_cast<const FillTaskArgs *>(data);
 
-  AffineAccessor<int, 2> arrayA_accessor(task_args.arrayA_instance, 0);
-  AffineAccessor<int, 2> arrayB_accessor(task_args.arrayB_instance, 0);
+  AffineAccessor<int, 2> arrayA_accessor(task_args.linear_instance, FID_A);
+  AffineAccessor<int, 2> arrayB_accessor(task_args.linear_instance, FID_B);
 
   const Rect<2> bounds =
-      task_args.arrayA_instance.get_indexspace<2>().bounds;
+      task_args.linear_instance.get_indexspace<2>().bounds;
 
   for (PointInRectIterator<2> pir(bounds); pir.valid; pir.step()) {
     arrayA_accessor.write(pir.p, rand() % 100);
@@ -142,8 +145,8 @@ static void check_task(const void *data, size_t datalen, const void *userdata,
                        size_t userlen, Processor p) {
   assert(datalen == sizeof(CheckTaskArgs));
   const CheckTaskArgs &task_args = *static_cast<const CheckTaskArgs *>(data);
+  AffineAccessor<int, 2> host_linear_accessor(task_args.host_check_instance, FID_C);
   AffineAccessor<int, 2> device_linear_accessor(task_args.device_check_instance, 0);
-  AffineAccessor<int, 2> host_linear_accessor(task_args.host_check_instance, 0);
   
   // bounds are the same in both cases
   const Rect<2> bounds =
@@ -188,12 +191,16 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   kern.load();
 
   const size_t width = WIDTH, height = HEIGHT;
-  std::vector<size_t> field_sizes(1, sizeof(int));
+
+  std::map<FieldID, size_t> field_sizes;
+  field_sizes[FID_A] = sizeof(int);
+  field_sizes[FID_B] = sizeof(int);
+  field_sizes[FID_C] = sizeof(int);
 
   Rect<2> bounds(Point<2>(0, 0), Point<2>(width - 1, height - 1));
 
 
-   Processor cpu = Machine::ProcessorQuery(Machine::get_machine())
+  Processor cpu = Machine::ProcessorQuery(Machine::get_machine())
                       .only_kind(Processor::LOC_PROC)
                       .local_address_space()
                       .first();
@@ -201,7 +208,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
          "Failed to find suitable CPU processor to check results!");
 
   Memory cpu_mem = Machine::MemoryQuery(Machine::get_machine())
-                       .has_capacity(4 * width * height * sizeof(int))
+                       .has_capacity(4 * bounds.volume() * sizeof(int))
                        .has_affinity_to(cpu)
                        .has_affinity_to(dpu)
                        .first();
@@ -212,30 +219,20 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   std::cout << "Choosing CPU memory type " << cpu_mem.kind()
             << " for CPU processor " << cpu << std::endl;
 
-  RegionInstance host_arrayA_instance = RegionInstance::NO_INST;
-  Event host_arrayA_instance_ready =
-      RegionInstance::create_instance(host_arrayA_instance, cpu_mem, bounds,
-                                      field_sizes, 1, ProfilingRequestSet());
-
-  RegionInstance host_arrayB_instance = RegionInstance::NO_INST;
-  Event host_arrayB_instance_ready =
-      RegionInstance::create_instance(host_arrayB_instance, cpu_mem, bounds,
-                                      field_sizes, 1, ProfilingRequestSet());
-
-  RegionInstance host_arrayC_instance = RegionInstance::NO_INST;
-  Event host_arrayC_instance_ready =
-      RegionInstance::create_instance(host_arrayC_instance, cpu_mem, bounds,
-                                      field_sizes, 1, ProfilingRequestSet());
-
+  RegionInstance host_linear_instance = RegionInstance::NO_INST;
+  Event host_linear_instance_ready =
+      RegionInstance::create_instance(host_linear_instance, cpu_mem, bounds,
+                                      field_sizes, 0, ProfilingRequestSet());
+  
   // ==== Data Movement ====
   Event host_arrayA_fill_done = Event::NO_EVENT;
   {
     std::vector<CopySrcDstField> srcs(1), dsts(1);
 
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(host_arrayA_instance, 0, field_sizes[0]);
+    dsts[0].set_field(host_linear_instance, FID_A, field_sizes[FID_A]);
     host_arrayA_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                                        host_arrayA_instance_ready);
+                                        host_linear_instance_ready);
 
   }
   Event host_arrayB_fill_done = Event::NO_EVENT;
@@ -244,9 +241,9 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(host_arrayB_instance, 0, field_sizes[0]);
+    dsts[0].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
     host_arrayB_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                                        host_arrayB_instance_ready);
+                                        host_linear_instance_ready);
   }
 
   Event host_arrayC_fill_done = Event::NO_EVENT;
@@ -255,10 +252,11 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(host_arrayC_instance, 0, field_sizes[0]);
+    dsts[0].set_field(host_linear_instance, FID_C, field_sizes[FID_C]);
     host_arrayC_fill_done = bounds.copy(srcs, dsts, ProfilingRequestSet(),
-                                        host_arrayC_instance_ready);
+                                        host_linear_instance_ready);
   }
+
   Event host_fill_done_event = Event::merge_events(
       host_arrayA_fill_done, host_arrayB_fill_done, host_arrayC_fill_done);
 
@@ -266,8 +264,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   Event fill_task_done_event = Event::NO_EVENT;
   {
     FillTaskArgs args;
-    args.arrayA_instance = host_arrayA_instance;
-    args.arrayB_instance = host_arrayB_instance;
+    args.linear_instance = host_linear_instance;
     fill_task_done_event =
         cpu.spawn(FILL_TASK, &args, sizeof(args), host_fill_done_event);
   }
@@ -284,17 +281,9 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
          "Failed to find suitable DPU memory to use for bound 3!");
 
   // Now create a 2D instance like we normally would
-  RegionInstance arrayA_instance = RegionInstance::NO_INST;
-  Event arrayA_instance_ready = RegionInstance::create_instance(
-      arrayA_instance, dpu_mem, bounds, field_sizes, 1, ProfilingRequestSet());
-
-  RegionInstance arrayB_instance = RegionInstance::NO_INST;
-  Event arrayB_instance_ready = RegionInstance::create_instance(
-      arrayB_instance, dpu_mem, bounds, field_sizes, 1, ProfilingRequestSet());
-
-  RegionInstance arrayC_instance = RegionInstance::NO_INST;
-  Event arrayC_instance_ready = RegionInstance::create_instance(
-      arrayC_instance, dpu_mem, bounds, field_sizes, 1, ProfilingRequestSet());
+  RegionInstance device_linear_instance = RegionInstance::NO_INST;
+  Event device_instance_ready = RegionInstance::create_instance(
+      device_linear_instance, dpu_mem, bounds, field_sizes, 0, ProfilingRequestSet());
 
   // ==== Data Movement ====
   Event arrayA_fill_done = Event::NO_EVENT;
@@ -303,13 +292,13 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(arrayA_instance, 0, field_sizes[0]);
+    dsts[0].set_field(device_linear_instance, FID_A, field_sizes[FID_A]);
     arrayA_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), arrayA_instance_ready);
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
 
     // Overwrite the previous fill with the data from the array
-    srcs[0].set_field(host_arrayA_instance, 0, field_sizes[0]);
-    dsts[0].set_field(arrayA_instance, 0, field_sizes[0]);
+    srcs[0].set_field(host_linear_instance, FID_A, field_sizes[FID_A]);
+    dsts[0].set_field(device_linear_instance, FID_A, field_sizes[FID_A]);
     arrayA_fill_done =
         bounds.copy(srcs, dsts, ProfilingRequestSet(),
                     Event::merge_events(arrayA_fill_done, fill_task_done_event));
@@ -320,13 +309,13 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(arrayB_instance, 0, field_sizes[0]);
+    dsts[0].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
     arrayB_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), arrayB_instance_ready);
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
 
     // Overwrite the previous fill with the data from the array
-    srcs[0].set_field(host_arrayB_instance, 0, field_sizes[0]);
-    dsts[0].set_field(arrayB_instance, 0, field_sizes[0]);
+    srcs[0].set_field(host_linear_instance, FID_B, field_sizes[FID_B]);
+    dsts[0].set_field(device_linear_instance, FID_B, field_sizes[FID_B]);
     arrayB_fill_done =
         bounds.copy(srcs, dsts, ProfilingRequestSet(),
                     Event::merge_events(arrayB_fill_done, fill_task_done_event));
@@ -338,11 +327,11 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
 
     // Fill the linear array with ones.
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(arrayC_instance, 0, field_sizes[0]);
+    dsts[0].set_field(device_linear_instance, FID_C, field_sizes[FID_C]);
     arrayC_fill_done =
-        bounds.copy(srcs, dsts, ProfilingRequestSet(), arrayC_instance_ready);
+        bounds.copy(srcs, dsts, ProfilingRequestSet(), device_instance_ready);
   }
-  Event dpu_fill_done_event =
+  Event device_fill_done_event =
       Event::merge_events(arrayA_fill_done, arrayB_fill_done, arrayC_fill_done);
 
   // ==== Task Spawning ====
@@ -350,9 +339,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   {
     DPU_TASK_ARGS args;
     args.bounds = bounds;
-    args.arrayA_instance = host_arrayA_instance;
-    args.arrayB_instance = host_arrayB_instance;
-    args.arrayC_instance = host_arrayC_instance;
+    args.linear_instance = host_linear_instance;
     cpu_task_done_event =
         cpu.spawn(CPU_LAUNCH_TASK, &args, sizeof(args), fill_task_done_event);
   };
@@ -361,18 +348,16 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   {
     DPU_TASK_ARGS args;
     args.bounds = bounds;
-    args.arrayA_instance = arrayA_instance;
-    args.arrayB_instance = arrayB_instance;
-    args.arrayC_instance = arrayC_instance;
+    args.linear_instance = device_linear_instance;
     args.kernel = kern;
     dpu_task_done_event =
-        dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), dpu_fill_done_event);
+        dpu.spawn(DPU_LAUNCH_TASK, &args, sizeof(args), device_fill_done_event);
   };
 
-
+  std::vector<size_t> check_field_size(1, sizeof(int));
   RegionInstance check_instance = RegionInstance::NO_INST;
   Event check_instance_ready_event = RegionInstance::create_instance(
-      check_instance, cpu_mem, bounds, field_sizes, 1, ProfilingRequestSet());
+      check_instance, cpu_mem, bounds, check_field_size, 0, ProfilingRequestSet());
 
   // Copy the result back, waiting on the processing to complete
   Event copy_done_event = Event::NO_EVENT;
@@ -380,12 +365,12 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
     std::vector<CopySrcDstField> srcs(1), dsts(1);
     // Initialize the host memory with some data
     srcs[0].set_fill<int>(1);
-    dsts[0].set_field(check_instance, 0, field_sizes[0]);
+    dsts[0].set_field(check_instance, 0, check_field_size[0]);
     copy_done_event = bounds.copy(srcs, dsts, ProfilingRequestSet(),
                                   check_instance_ready_event);
     // Overwrite the previous fill with the data from the array
-    srcs[0].set_field(arrayC_instance, 0, field_sizes[0]);
-    dsts[0].set_field(check_instance, 0, field_sizes[0]);
+    srcs[0].set_field(device_linear_instance, FID_C, field_sizes[FID_C]);
+    dsts[0].set_field(check_instance, 0, check_field_size[0]);
     copy_done_event =
         bounds.copy(srcs, dsts, ProfilingRequestSet(),
                     Event::merge_events(copy_done_event, dpu_task_done_event));
@@ -395,7 +380,7 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
   Event check_task_done_event = Event::NO_EVENT;
   {
     CheckTaskArgs args;
-    args.host_check_instance = host_arrayC_instance;
+    args.host_check_instance = host_linear_instance;
     args.device_check_instance = check_instance;
     check_task_done_event =
         cpu.spawn(CHECK_TASK, &args, sizeof(args), Event::merge_events(copy_done_event, cpu_task_done_event));
