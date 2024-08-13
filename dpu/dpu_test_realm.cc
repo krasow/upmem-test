@@ -6,7 +6,7 @@ extern "C" {
 #include <barrier.h>
 }
 
-#include <realm/upmem/realm_c_upmem.h>
+#include <realm/upmem/legion_c_upmem.h>
 
 typedef enum DPU_LAUNCH_KERNELS{
   test,
@@ -14,22 +14,18 @@ typedef enum DPU_LAUNCH_KERNELS{
 } DPU_LAUNCH_KERNELS;
 
 
-// typedef FieldAccessor<READ_ONLY,double,1,coord_t,
-//                       Realm::AffineAccessor<double,1,coord_t> > AccessorRO;
-// typedef FieldAccessor<WRITE_DISCARD,double,1,coord_t,
-//                       Realm::AffineAccessor<double,1,coord_t> > AccessorWD;
-
+typedef FieldAccessor<LEGION_READ_ONLY,double,1,coord_t,
+                      Realm::AffineAccessor<double,1,coord_t> > AccessorRO;
+typedef FieldAccessor<LEGION_WRITE_DISCARD,double,1,coord_t,
+                      Realm::AffineAccessor<double,1,coord_t> > AccessorWD;
 
 typedef struct __DPU_LAUNCH_ARGS {
-//   Rect<1> rect;
-//   AccessorRO acc_y;
-//   AccessorRO acc_x;
-//   AccessorWD acc_z;
-  AffineAccessor<double, 1> acc_y;
-  AffineAccessor<double, 1> acc_x;
-  AffineAccessor<double, 1> acc_z;
-  double alpha;
   DPU_LAUNCH_KERNELS kernel;
+  double alpha;
+  AccessorRO acc_y;
+  AccessorRO acc_x;
+  AccessorWD acc_z;
+  Rect<1> rect;
   PADDING(8);
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
 

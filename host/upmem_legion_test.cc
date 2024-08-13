@@ -31,9 +31,9 @@
 
 using namespace Legion;
 
-typedef FieldAccessor<READ_ONLY,double,1,coord_t,
+typedef FieldAccessor<LEGION_READ_ONLY,double,1,coord_t,
                       Realm::AffineAccessor<double,1,coord_t> > AccessorRO;
-typedef FieldAccessor<WRITE_DISCARD,double,1,coord_t,
+typedef FieldAccessor<LEGION_WRITE_DISCARD,double,1,coord_t,
                       Realm::AffineAccessor<double,1,coord_t> > AccessorWD;
 
 enum TaskIDs {
@@ -43,8 +43,6 @@ enum TaskIDs {
   CHECK_TASK_ID,
 };
 
-
-
 typedef enum {
   test,
   nr_kernels = 1,
@@ -52,12 +50,12 @@ typedef enum {
 
 
 typedef struct {
-  Rect<1> rect;
+  DPU_LAUNCH_KERNELS kernel;
+  double alpha;
   AccessorRO acc_y;
   AccessorRO acc_x;
   AccessorWD acc_z;
-  double alpha;
-  DPU_LAUNCH_KERNELS kernel;
+  Rect<1> rect;
   PADDING(8);
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
 
