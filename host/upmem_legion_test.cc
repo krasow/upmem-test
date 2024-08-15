@@ -50,12 +50,12 @@ typedef enum {
 
 
 typedef struct {
-  DPU_LAUNCH_KERNELS kernel;
   double alpha;
+  Rect<1> rect;
   AccessorRO acc_y;
   AccessorRO acc_x;
   AccessorWD acc_z;
-  Rect<1> rect;
+  DPU_LAUNCH_KERNELS kernel;
   PADDING(8);
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
 
@@ -110,8 +110,8 @@ void top_level_task(const Task *task,
   kern.load();
 
 
-  int num_elements = 1024; 
-  int num_subregions = 4;
+  int num_elements = 256; 
+  int num_subregions = 1;
   int soa_flag = 0;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies
@@ -432,11 +432,11 @@ void daxpy_task(const Task *task,
           acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
   {
     DPU_LAUNCH_ARGS args;
+    args.alpha = alpha;
     args.rect = rect;
     args.acc_y = acc_y;
     args.acc_x = acc_x;
     args.acc_z = acc_z;
-    args.alpha = alpha;
     args.kernel = test;
     // launch specific upmem kernel
     task_args.kernel.launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
