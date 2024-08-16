@@ -62,7 +62,7 @@ typedef struct {
 
 typedef struct {
   double alpha;
-  Realm::Upmem::Kernel kernel;
+  Realm::Upmem::Kernel* kernel;
 } DPU_TASK_ARGS;
 
 
@@ -102,9 +102,9 @@ void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions,
                     Context ctx, Runtime *runtime)
 {
-  Realm::Upmem::Kernel kern = Realm::Upmem::Kernel(DPU_LAUNCH_BINARY);
+  Realm::Upmem::Kernel* kern = new Realm::Upmem::Kernel(DPU_LAUNCH_BINARY);
   // the binary needs to be loaded before any memory operations
-  kern.load();
+  kern->load();
 
   int num_elements = 4096; 
   int num_subregions = 4;
@@ -435,7 +435,7 @@ void daxpy_task(const Task *task,
     args.acc_z = acc_z;
     args.kernel = test;
     // launch specific upmem kernel
-    task_args.kernel.launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+    task_args.kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
   }
 }
 
