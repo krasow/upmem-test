@@ -102,16 +102,12 @@ void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions,
                     Context ctx, Runtime *runtime)
 {
-  // create a stream (aka dpu_set_t)
-  dpu_set_t *stream = new dpu_set_t;
-  // must associate a kernel with a stream
-  Realm::Upmem::Kernel kern = Realm::Upmem::Kernel(DPU_LAUNCH_BINARY, stream);
+  Realm::Upmem::Kernel kern = Realm::Upmem::Kernel(DPU_LAUNCH_BINARY);
   // the binary needs to be loaded before any memory operations
   kern.load();
 
-
-  int num_elements = 256; 
-  int num_subregions = 1;
+  int num_elements = 4096; 
+  int num_subregions = 4;
   int soa_flag = 0;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies

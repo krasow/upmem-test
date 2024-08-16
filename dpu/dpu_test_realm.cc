@@ -46,15 +46,11 @@ BARRIER_INIT(my_barrier, NR_TASKLETS);
 int (*kernels[nr_kernels])(void) = {main_kernel1};
 
 int main(void) {
-    // return kernels[args->kernel](); 
-    return main_kernel1();
+    return kernels[args->kernel](); 
 }
 
 int main_kernel1() {
     unsigned int tasklet_id = me();
-    if (tasklet_id == 0) {
-        printf("running with %d Tasklets\n", NR_TASKLETS);
-    }
 
     printf("DEVICE:::: Running daxpy computation with alpha %.8f xptr %p, y_ptr %p, z_ptr %p...\n", 
         args->alpha,
@@ -64,8 +60,8 @@ int main_kernel1() {
         
        args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
 
-       printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
-       printf("write %f\n",args->acc_z[*pir]);
+    //    printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
+    //    printf("write %f\n",args->acc_z[*pir]);
     }
 
     return 0;
