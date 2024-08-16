@@ -106,8 +106,8 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = 4096; 
-  int num_subregions = 4;
+  int num_elements = 262144; 
+  int num_subregions = 32;
   int soa_flag = 0;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies

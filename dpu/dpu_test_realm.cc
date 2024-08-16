@@ -57,11 +57,9 @@ int main_kernel1() {
         args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo), args->acc_z.ptr(args->rect.lo));
 
     for (Legion::PointInRectIterator<1> pir(args->rect); pir(); pir++) {
-        
        args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
-
-    //    printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
-    //    printf("write %f\n",args->acc_z[*pir]);
+      //  printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
+      //  printf("write %f\n",args->acc_z[*pir]);
     }
 
     return 0;
