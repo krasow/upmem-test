@@ -38,7 +38,7 @@ enum FieldIDs {
 typedef struct {
   Rect<2> bounds;
   RegionInstance linear_instance;
-  Upmem::Kernel kernel;
+  Upmem::Kernel* kernel;
 } __attribute__((aligned(8))) DPU_TASK_ARGS;
 
 // for the device
@@ -81,7 +81,7 @@ static void dpu_launch_task(const void *data, size_t datalen,
     args.arrayC_accessor = arrayC_accessor;
     args.kernel = test;
     // launch specific upmem kernel
-    task_args.kernel.launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+    task_args.kernel->launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
   }
 }
 
@@ -183,12 +183,9 @@ void top_level_task(const void *args, size_t arglen, const void *userdata,
                     size_t userlen, Processor dpu) {
   log_app.print() << "top task running on " << dpu;
 
-  // create a stream (aka dpu_set_t)
-  dpu_set_t *stream = new dpu_set_t;
-  // must associate a kernel with a stream
-  Upmem::Kernel kern = Upmem::Kernel(DPU_LAUNCH_BINARY, stream);
+  Upmem::Kernel* kern = new Upmem::Kernel(DPU_LAUNCH_BINARY);
   // the binary needs to be loaded before any memory operations
-  kern.load();
+  kern->load();
 
   const size_t width = WIDTH, height = HEIGHT;
 
