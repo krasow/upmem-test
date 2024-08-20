@@ -40,12 +40,14 @@ enum TaskIDs {
   TOP_LEVEL_TASK_ID,
   INIT_FIELD_TASK_ID,
   DAXPY_TASK_ID,
+  ZERO_TASK_ID,
   CHECK_TASK_ID,
 };
 
 typedef enum {
   test,
-  nr_kernels = 1,
+  zero,
+  nr_kernels = 2,
 } DPU_LAUNCH_KERNELS;
 
 
@@ -106,7 +108,7 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = 262144; 
+  int num_elements = 262144;
   int num_subregions = 32;
   int soa_flag = 0;
   // See if we have any command line arguments to parse
@@ -280,6 +282,9 @@ void top_level_task(const Task *task,
   // the same as example 02.
   IndexLauncher init_launcher(INIT_FIELD_TASK_ID, color_is, 
                               TaskArgument(NULL, 0), arg_map);
+
+  IndexLauncher zero_launcher(ZERO_TASK_ID, color_is, 
+                            TaskArgument(&kern, sizeof( Realm::Upmem::Kernel*)), arg_map);
   // For index space task launches we don't want to have to explicitly
   // enumerate separate region requirements for all points in our launch
   // domain.  Instead Legion allows applications to place an upper bound
@@ -304,6 +309,21 @@ void top_level_task(const Task *task,
   // projections functions via the 'register_region_projection' and
   // 'register_partition_projection' functions before starting 
   // the runtime similar to how tasks are registered.
+  zero_launcher.add_region_requirement(
+      RegionRequirement(input_lp, 0/*projection ID*/, 
+                        WRITE_DISCARD, EXCLUSIVE, input_lr));
+  zero_launcher.region_requirements[0].add_field(FID_X);
+  FutureMap zero_future = runtime->execute_index_space(ctx, zero_launcher);
+
+  zero_launcher.region_requirements[0].privilege_fields.clear();
+  zero_launcher.region_requirements[0].instance_fields.clear();
+  zero_launcher.region_requirements[0].add_field(FID_Y);
+  FutureMap zero_future2 = runtime->execute_index_space(ctx, zero_launcher);
+
+  zero_future.wait_all_results();
+  zero_future2.wait_all_results();
+
+
   init_launcher.add_region_requirement(
       RegionRequirement(input_lp, 0/*projection ID*/, 
                         WRITE_DISCARD, EXCLUSIVE, input_lr));
@@ -439,6 +459,22 @@ void daxpy_task(const Task *task,
   }
 }
 
+
+void zero_task(const Task *task,
+                const std::vector<PhysicalRegion> &regions,
+                Context ctx, Runtime *runtime)
+{
+  assert(task->arglen == sizeof(Realm::Upmem::Kernel*));
+  Realm::Upmem::Kernel* kernel = *((Realm::Upmem::Kernel**)task->args);
+  {
+    DPU_LAUNCH_ARGS args;
+    args.kernel = zero;
+    // launch specific upmem kernel
+    kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+  }
+}
+
+
 void check_task(const Task *task,
                 const std::vector<PhysicalRegion> &regions,
                 Context ctx, Runtime *runtime)
@@ -458,6 +494,9 @@ void check_task(const Task *task,
   printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n", 
           acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
   bool all_passed = true;
+  size_t count = 0;
+  size_t errors = 0;
+
   for (PointInRectIterator<1> pir(rect); pir(); pir++)
   {
     double expected = alpha * acc_x[*pir] + acc_y[*pir];
@@ -465,15 +504,27 @@ void check_task(const Task *task,
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.
+
     if (!compare_double(expected, received)) {
       all_passed = false;
       printf("expected %f, received %f\n", expected, received);
+      printf("location: %ld\n", count);
+      errors++;
     }
+
+    // if (!compare_double(0.0, received)) {
+    //   all_passed = false;
+    //   printf("expected %f, received %f\n", 0.0, received);
+    //   printf("location: %ld\n", count);
+    //   errors++;
+    // }
+    count++;
   }
   if (all_passed)
     printf("SUCCESS!\n");
   else {
     printf("FAILURE!\n");
+    printf("%ld ERRORS WERE FOUND\n", errors);
     abort();
   }
 }
@@ -501,6 +552,14 @@ int main(int argc, char **argv)
     registrar.set_leaf();
     Runtime::preregister_task_variant<daxpy_task>(registrar, "daxpy");
   }
+
+  {
+    TaskVariantRegistrar registrar(ZERO_TASK_ID, "zero");
+    registrar.add_constraint(ProcessorConstraint(Processor::DPU_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<zero_task>(registrar, "zero");
+  }
+
 
   {
     TaskVariantRegistrar registrar(CHECK_TASK_ID, "check");
