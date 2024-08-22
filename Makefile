@@ -39,12 +39,12 @@ GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .cc files for UPMEM source
 
 
 # You can modify these variables, some will be appended to by the runtime makefile
-INC_FLAGS	?=
-CC_FLAGS	?= -DLEGION_MAX_NUM_PROCS=128 #-DLEGION_SPY
+INC_FLAGS	?= -Iinclude
+CC_FLAGS	?= -DINT32 -DLEGION_MAX_NUM_PROCS=128 #-DLEGION_SPY 
 NVCC_FLAGS	?=
 HIPCC_FLAGS ?=
-UPMEMCC_FLAGS ?= -DUINT32 -g0 -g -DNR_TASKLETS=1
-GASNET_FLAGS	?=
+UPMEMCC_FLAGS ?= -DINT32 -DNR_TASKLETS=1
+GASNET_FLAGS  ?=
 LD_FLAGS	?=
 
 ###########################################################################

@@ -1,3 +1,20 @@
+/* Copyright 2024 Stanford University, Los Alamos National Laboratory,
+ *                Northwestern University
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 extern "C" {
 #include <stdint.h>
 #include <defs.h>
@@ -6,37 +23,18 @@ extern "C" {
 #include <barrier.h>
 }
 
-#include <realm/upmem/legion_c_upmem.h>
-
-typedef FieldAccessor<LEGION_READ_ONLY,double,1,coord_t,
-                      Realm::AffineAccessor<double,1,coord_t> > AccessorRO;
-typedef FieldAccessor<LEGION_WRITE_DISCARD,double,1,coord_t,
-                      Realm::AffineAccessor<double,1,coord_t> > AccessorWD;
-
-typedef enum DPU_LAUNCH_KERNELS{
-  test,
-  nr_kernels = 1
-} DPU_LAUNCH_KERNELS;
-
+/* legion programming system library for UPMEM */
+#include <realm/upmem/legion_c_upmem.h> 
+/* common header between device and host */
+#include <common.h> 
 
 typedef struct __DPU_LAUNCH_ARGS {
-  double alpha;
-  Rect<1> rect;
-  AccessorRO acc_y;
-  AccessorRO acc_x;
-  AccessorWD acc_z;
-  DPU_LAUNCH_KERNELS kernel;
-  PADDING(8);
+    char paddd[256];
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
 
+__host __DPU_LAUNCH_ARGS ARGS;  
 
-typedef struct DPU_LAUNCH_ARGS {
-    char paddd[256];
-} __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
-
-__host DPU_LAUNCH_ARGS ARGS;  
-
-__DPU_LAUNCH_ARGS* args = (__DPU_LAUNCH_ARGS*)(&ARGS);
+DPU_LAUNCH_ARGS* args = (DPU_LAUNCH_ARGS*)(&ARGS);
 
 int main_kernel1();
 
@@ -52,9 +50,14 @@ int main(void) {
 int main_kernel1() {
     unsigned int tasklet_id = me();
 
-    printf("DEVICE:::: Running daxpy computation with alpha %.8f xptr %p, y_ptr %p, z_ptr %p...\n", 
-        args->alpha,
+    printf("DEVICE:::: Running daxpy computation with xptr %p, y_ptr %p, z_ptr %p...\n", 
         args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo), args->acc_z.ptr(args->rect.lo));
+
+  #if defined(INT32)
+    printf(" alpha = %d \n", args->alpha); 
+  #elif defined(DOUBLE)
+    printf(" alpha = %f \n", args->alpha); 
+  #endif
 
     for (Legion::PointInRectIterator<1> pir(args->rect); pir(); pir++) {
        args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 

@@ -1,5 +1,6 @@
-/* Copyright 2024 Stanford University, Los Alamos National Laboratory
- *
+/* Copyright 2024 Stanford University, Los Alamos National Laboratory,
+ *                Northwestern University
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -20,21 +21,28 @@
 #include <sys/time.h>
 #include <math.h>
 #include <limits>
-#include "legion.h"
 
-#include <realm/upmem/upmem_access.h>
+/* legion programming system library */
+#include <legion.h> 
+/* common header between device and host */
+#include <common.h>
 
-
-#if !defined(REALM_USE_UPMEM) 
-#error Realm not compiled with UPMEM enabled
-#endif // !defined(REALM_USE_UPMEM) 
+#if !defined(LEGION_USE_UPMEM) 
+#error Legion not compiled with UPMEM enabled
+#endif // !defined(LEGION_USE_UPMEM) 
 
 using namespace Legion;
 
-typedef FieldAccessor<LEGION_READ_ONLY,double,1,coord_t,
-                      Realm::AffineAccessor<double,1,coord_t> > AccessorRO;
-typedef FieldAccessor<LEGION_WRITE_DISCARD,double,1,coord_t,
-                      Realm::AffineAccessor<double,1,coord_t> > AccessorWD;
+#if defined(INT32)
+#define RANDOM_NUMBER rand() % 8192
+#define COMPARE(x, y) compare_int(x, y)
+#define PRINT_EXPECTED(x, y) printf("expected %d, received %d --> ", x, y)  
+
+#elif defined(DOUBLE)
+#define RANDOM_NUMBER drand48()
+#define COMPARE(x, y) compare_double(x, y)
+#define PRINT_EXPECTED(x, y) printf("expected %f, received %f --> ", x, y)
+#endif
 
 enum TaskIDs {
   TOP_LEVEL_TASK_ID,
@@ -43,25 +51,8 @@ enum TaskIDs {
   CHECK_TASK_ID,
 };
 
-typedef enum {
-  test,
-  nr_kernels = 1,
-} DPU_LAUNCH_KERNELS;
-
-
 typedef struct {
-  double alpha;
-  Rect<1> rect;
-  AccessorRO acc_y;
-  AccessorRO acc_x;
-  AccessorWD acc_z;
-  DPU_LAUNCH_KERNELS kernel;
-  PADDING(8);
-} __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
-
-
-typedef struct {
-  double alpha;
+  T alpha;
   Realm::Upmem::Kernel* kernel;
 } DPU_TASK_ARGS;
 
@@ -77,9 +68,9 @@ enum FieldIDs {
 };
 
 typedef struct{
-    double x;
-    double y;
-    double z;
+    T x;
+    T y;
+    T z;
 }daxpy_t;
 
 double get_cur_time() {
@@ -96,6 +87,11 @@ double get_cur_time() {
 bool compare_double(double a, double b)
 {
   return fabs(a - b) < std::numeric_limits<double>::epsilon();
+}
+
+bool compare_int(int a, int b)
+{
+  return a == b;
 }
 
 void top_level_task(const Task *task,
@@ -136,11 +132,11 @@ void top_level_task(const Task *task,
   {
     FieldAllocator allocator = 
       runtime->create_field_allocator(ctx, fs);
-    allocator.allocate_field(sizeof(double),FID_X);
+    allocator.allocate_field(sizeof(T),FID_X);
     runtime->attach_name(fs, FID_X, "X");
-    allocator.allocate_field(sizeof(double),FID_Y);
+    allocator.allocate_field(sizeof(T),FID_Y);
     runtime->attach_name(fs, FID_Y, "Y");
-    allocator.allocate_field(sizeof(double),FID_Z);
+    allocator.allocate_field(sizeof(T),FID_Z);
     runtime->attach_name(fs, FID_Z, "Z");
   }
   LogicalRegion input_lr = runtime->create_logical_region(ctx, is, fs);
@@ -149,19 +145,19 @@ void top_level_task(const Task *task,
   runtime->attach_name(output_lr, "output_lr");
   
   PhysicalRegion xy_pr, z_pr;
-  double *z_ptr = NULL;
-  double *xy_ptr = NULL;
-  double *xyz_ptr = NULL;
+  T *z_ptr = NULL;
+  T *xy_ptr = NULL;
+  T *xyz_ptr = NULL;
   if (soa_flag == 0) 
   { // SOA
-    size_t xy_bytes = 2*sizeof(double)*(num_elements);
-    xy_ptr = (double*)malloc(xy_bytes);
-    size_t z_bytes = sizeof(double)*(num_elements);
-    z_ptr = (double*)malloc(z_bytes);
+    size_t xy_bytes = 2*sizeof(T)*(num_elements);
+    xy_ptr = (T*)malloc(xy_bytes);
+    size_t z_bytes = sizeof(T)*(num_elements);
+    z_ptr = (T*)malloc(z_bytes);
     for (int j = 0; j < num_elements; j++ ) {
-        xy_ptr[j]               = drand48();
-        xy_ptr[num_elements+j]  = drand48();
-        z_ptr[j]                = drand48();
+        xy_ptr[j]               = RANDOM_NUMBER;
+        xy_ptr[num_elements+j]  = RANDOM_NUMBER;
+        z_ptr[j]                = RANDOM_NUMBER;
     }
     {
       printf("Attach SOA array fid %d, fid %d, ptr %p\n", 
@@ -328,7 +324,7 @@ void top_level_task(const Task *task,
   double end_init = get_cur_time();
   printf("Attach array, init done, time %f\n", end_init - start_init);
 
-  const double alpha = drand48();
+  const T alpha = RANDOM_NUMBER;
   double start_t = get_cur_time();
 
   DPU_TASK_ARGS args;
@@ -404,7 +400,7 @@ void init_field_task(const Task *task,
   Rect<1> rect = runtime->get_index_space_domain(ctx,
                   task->regions[0].region.get_index_space());
   for (PointInRectIterator<1> pir(rect); pir(); pir++)
-    acc[*pir] = 564.9999;
+    acc[*pir] = RANDOM_NUMBER;
 }
 
 void daxpy_task(const Task *task,
@@ -415,7 +411,7 @@ void daxpy_task(const Task *task,
   assert(task->regions.size() == 2);
   assert(task->arglen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS*)task->args);
-  const double alpha = task_args.alpha;
+  const T alpha = task_args.alpha;
   const int point = task->index_point.point_data[0];
 
   const AccessorRO acc_y(regions[0], FID_Y);
@@ -424,9 +420,15 @@ void daxpy_task(const Task *task,
 
   Rect<1> rect = runtime->get_index_space_domain(ctx,
                   task->regions[0].region.get_index_space());
-  printf("Running daxpy computation with alpha %.8g for point %d, xptr %p, y_ptr %p, z_ptr %p...\n", 
-          alpha, point, 
-          acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
+  printf("Running daxpy computation for point %d, xptr %p, y_ptr %p, z_ptr %p...", 
+          point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
+
+  #if (T == _int) 
+    printf(" alpha = %d \n", alpha); 
+  #elif (T == _double) 
+    printf(" alpha = %f \n", alpha); 
+  #endif
+  
   {
     DPU_LAUNCH_ARGS args;
     args.alpha = alpha;
@@ -436,7 +438,7 @@ void daxpy_task(const Task *task,
     args.acc_z = acc_z;
     args.kernel = test;
     // launch specific upmem kernel
-    // task_args.kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+    task_args.kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
   }
 }
 
@@ -446,8 +448,8 @@ void check_task(const Task *task,
 {
   assert(regions.size() == 2);
   assert(task->regions.size() == 2);
-  assert(task->arglen == sizeof(double));
-  const double alpha = *((const double*)task->args);
+  assert(task->arglen == sizeof(T));
+  const T alpha = *((const T*)task->args);
 
   const AccessorRO acc_x(regions[0], FID_X);
   const AccessorRO acc_y(regions[0], FID_Y);
@@ -464,22 +466,14 @@ void check_task(const Task *task,
 
   for (PointInRectIterator<1> pir(rect); pir(); pir++)
   {
-    double expected = alpha * acc_x[*pir] + acc_y[*pir];
-    double received = acc_z[*pir];
+    T expected = alpha * acc_x[*pir] + acc_y[*pir];
+    T received = acc_z[*pir];
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.
-
-    // if (!compare_double(expected, received)) {
-    //   all_passed = false;
-    //   printf("expected %f, received %f --> ", expected, received);
-    //   printf("location: %ld\n", count);
-    //   errors++;
-    // }
-
-    if (!compare_double(0.0, received)) {
+    if (!COMPARE(expected, received)) {
       all_passed = false;
-      printf("expected %f, received %f ---> ", 0.0, received);
+      PRINT_EXPECTED(expected, received);
       printf("location: %ld\n", count);
       errors++;
     }
