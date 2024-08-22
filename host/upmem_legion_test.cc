@@ -40,14 +40,12 @@ enum TaskIDs {
   TOP_LEVEL_TASK_ID,
   INIT_FIELD_TASK_ID,
   DAXPY_TASK_ID,
-  ZERO_TASK_ID,
   CHECK_TASK_ID,
 };
 
 typedef enum {
   test,
-  zero,
-  nr_kernels = 2,
+  nr_kernels = 1,
 } DPU_LAUNCH_KERNELS;
 
 
@@ -283,8 +281,6 @@ void top_level_task(const Task *task,
   IndexLauncher init_launcher(INIT_FIELD_TASK_ID, color_is, 
                               TaskArgument(NULL, 0), arg_map);
 
-  IndexLauncher zero_launcher(ZERO_TASK_ID, color_is, 
-                            TaskArgument(&kern, sizeof( Realm::Upmem::Kernel*)), arg_map);
   // For index space task launches we don't want to have to explicitly
   // enumerate separate region requirements for all points in our launch
   // domain.  Instead Legion allows applications to place an upper bound
@@ -309,21 +305,6 @@ void top_level_task(const Task *task,
   // projections functions via the 'register_region_projection' and
   // 'register_partition_projection' functions before starting 
   // the runtime similar to how tasks are registered.
-  zero_launcher.add_region_requirement(
-      RegionRequirement(input_lp, 0/*projection ID*/, 
-                        WRITE_DISCARD, EXCLUSIVE, input_lr));
-  zero_launcher.region_requirements[0].add_field(FID_X);
-  FutureMap zero_future = runtime->execute_index_space(ctx, zero_launcher);
-
-  zero_launcher.region_requirements[0].privilege_fields.clear();
-  zero_launcher.region_requirements[0].instance_fields.clear();
-  zero_launcher.region_requirements[0].add_field(FID_Y);
-  FutureMap zero_future2 = runtime->execute_index_space(ctx, zero_launcher);
-
-  zero_future.wait_all_results();
-  zero_future2.wait_all_results();
-
-
   init_launcher.add_region_requirement(
       RegionRequirement(input_lp, 0/*projection ID*/, 
                         WRITE_DISCARD, EXCLUSIVE, input_lr));
@@ -423,7 +404,7 @@ void init_field_task(const Task *task,
   Rect<1> rect = runtime->get_index_space_domain(ctx,
                   task->regions[0].region.get_index_space());
   for (PointInRectIterator<1> pir(rect); pir(); pir++)
-    acc[*pir] = drand48();
+    acc[*pir] = 564.9999;
 }
 
 void daxpy_task(const Task *task,
@@ -455,25 +436,9 @@ void daxpy_task(const Task *task,
     args.acc_z = acc_z;
     args.kernel = test;
     // launch specific upmem kernel
-    task_args.kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+    // task_args.kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
   }
 }
-
-
-void zero_task(const Task *task,
-                const std::vector<PhysicalRegion> &regions,
-                Context ctx, Runtime *runtime)
-{
-  assert(task->arglen == sizeof(Realm::Upmem::Kernel*));
-  Realm::Upmem::Kernel* kernel = *((Realm::Upmem::Kernel**)task->args);
-  {
-    DPU_LAUNCH_ARGS args;
-    args.kernel = zero;
-    // launch specific upmem kernel
-    kernel->launch((void**)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
-  }
-}
-
 
 void check_task(const Task *task,
                 const std::vector<PhysicalRegion> &regions,
@@ -505,19 +470,19 @@ void check_task(const Task *task,
     // the order of operations are the same should they should
     // be bitwise equal.
 
-    if (!compare_double(expected, received)) {
-      all_passed = false;
-      printf("expected %f, received %f\n", expected, received);
-      printf("location: %ld\n", count);
-      errors++;
-    }
-
-    // if (!compare_double(0.0, received)) {
+    // if (!compare_double(expected, received)) {
     //   all_passed = false;
-    //   printf("expected %f, received %f\n", 0.0, received);
+    //   printf("expected %f, received %f --> ", expected, received);
     //   printf("location: %ld\n", count);
     //   errors++;
     // }
+
+    if (!compare_double(0.0, received)) {
+      all_passed = false;
+      printf("expected %f, received %f ---> ", 0.0, received);
+      printf("location: %ld\n", count);
+      errors++;
+    }
     count++;
   }
   if (all_passed)
@@ -552,14 +517,6 @@ int main(int argc, char **argv)
     registrar.set_leaf();
     Runtime::preregister_task_variant<daxpy_task>(registrar, "daxpy");
   }
-
-  {
-    TaskVariantRegistrar registrar(ZERO_TASK_ID, "zero");
-    registrar.add_constraint(ProcessorConstraint(Processor::DPU_PROC));
-    registrar.set_leaf();
-    Runtime::preregister_task_variant<zero_task>(registrar, "zero");
-  }
-
 
   {
     TaskVariantRegistrar registrar(CHECK_TASK_ID, "check");

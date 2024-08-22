@@ -15,8 +15,7 @@ typedef FieldAccessor<LEGION_WRITE_DISCARD,double,1,coord_t,
 
 typedef enum DPU_LAUNCH_KERNELS{
   test,
-  zero,
-  nr_kernels = 2
+  nr_kernels = 1
 } DPU_LAUNCH_KERNELS;
 
 
@@ -40,22 +39,14 @@ __host DPU_LAUNCH_ARGS ARGS;
 __DPU_LAUNCH_ARGS* args = (__DPU_LAUNCH_ARGS*)(&ARGS);
 
 int main_kernel1();
-int zero_task();
 
 // Barrier
 BARRIER_INIT(my_barrier, NR_TASKLETS);
 
-int (*kernels[nr_kernels])(void) = {main_kernel1, zero_task};
+int (*kernels[nr_kernels])(void) = {main_kernel1};
 
 int main(void) {
     return kernels[args->kernel](); 
-}
-int zero_task() {
-  unsigned int tasklet_id = me();
-  if (tasklet_id == 0)
-    mem_reset();
-  printf("zero task is complete\n");
-  return 0;
 }
 
 int main_kernel1() {
