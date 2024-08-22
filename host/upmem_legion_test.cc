@@ -422,10 +422,9 @@ void daxpy_task(const Task *task,
                   task->regions[0].region.get_index_space());
   printf("Running daxpy computation for point %d, xptr %p, y_ptr %p, z_ptr %p...", 
           point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
-
-  #if (T == _int) 
+  #ifdef INT32
     printf(" alpha = %d \n", alpha); 
-  #elif (T == _double) 
+  #elif DOUBLE
     printf(" alpha = %f \n", alpha); 
   #endif
   

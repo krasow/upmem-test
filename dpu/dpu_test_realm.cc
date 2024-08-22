@@ -53,9 +53,9 @@ int main_kernel1() {
     printf("DEVICE:::: Running daxpy computation with xptr %p, y_ptr %p, z_ptr %p...\n", 
         args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo), args->acc_z.ptr(args->rect.lo));
 
-  #if defined(INT32)
+  #ifdef INT32
     printf(" alpha = %d \n", args->alpha); 
-  #elif defined(DOUBLE)
+  #elif DOUBLE
     printf(" alpha = %f \n", args->alpha); 
   #endif
 
