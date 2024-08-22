@@ -52,7 +52,7 @@ enum TaskIDs {
 };
 
 typedef struct {
-  T alpha;
+  TYPE alpha;
   Realm::Upmem::Kernel* kernel;
 } DPU_TASK_ARGS;
 
@@ -68,9 +68,9 @@ enum FieldIDs {
 };
 
 typedef struct{
-    T x;
-    T y;
-    T z;
+    TYPE x;
+    TYPE y;
+    TYPE z;
 }daxpy_t;
 
 double get_cur_time() {
@@ -132,11 +132,11 @@ void top_level_task(const Task *task,
   {
     FieldAllocator allocator = 
       runtime->create_field_allocator(ctx, fs);
-    allocator.allocate_field(sizeof(T),FID_X);
+    allocator.allocate_field(sizeof(TYPE),FID_X);
     runtime->attach_name(fs, FID_X, "X");
-    allocator.allocate_field(sizeof(T),FID_Y);
+    allocator.allocate_field(sizeof(TYPE),FID_Y);
     runtime->attach_name(fs, FID_Y, "Y");
-    allocator.allocate_field(sizeof(T),FID_Z);
+    allocator.allocate_field(sizeof(TYPE),FID_Z);
     runtime->attach_name(fs, FID_Z, "Z");
   }
   LogicalRegion input_lr = runtime->create_logical_region(ctx, is, fs);
@@ -145,15 +145,15 @@ void top_level_task(const Task *task,
   runtime->attach_name(output_lr, "output_lr");
   
   PhysicalRegion xy_pr, z_pr;
-  T *z_ptr = NULL;
-  T *xy_ptr = NULL;
-  T *xyz_ptr = NULL;
+  TYPE *z_ptr = NULL;
+  TYPE *xy_ptr = NULL;
+  TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) 
   { // SOA
-    size_t xy_bytes = 2*sizeof(T)*(num_elements);
-    xy_ptr = (T*)malloc(xy_bytes);
-    size_t z_bytes = sizeof(T)*(num_elements);
-    z_ptr = (T*)malloc(z_bytes);
+    size_t xy_bytes = 2*sizeof(TYPE)*(num_elements);
+    xy_ptr = (TYPE*)malloc(xy_bytes);
+    size_t z_bytes = sizeof(TYPE)*(num_elements);
+    z_ptr = (TYPE*)malloc(z_bytes);
     for (int j = 0; j < num_elements; j++ ) {
         xy_ptr[j]               = RANDOM_NUMBER;
         xy_ptr[num_elements+j]  = RANDOM_NUMBER;
@@ -324,7 +324,7 @@ void top_level_task(const Task *task,
   double end_init = get_cur_time();
   printf("Attach array, init done, time %f\n", end_init - start_init);
 
-  const T alpha = RANDOM_NUMBER;
+  const TYPE alpha = RANDOM_NUMBER;
   double start_t = get_cur_time();
 
   DPU_TASK_ARGS args;
@@ -411,7 +411,7 @@ void daxpy_task(const Task *task,
   assert(task->regions.size() == 2);
   assert(task->arglen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS*)task->args);
-  const T alpha = task_args.alpha;
+  const TYPE alpha = task_args.alpha;
   const int point = task->index_point.point_data[0];
 
   const AccessorRO acc_y(regions[0], FID_Y);
@@ -447,8 +447,8 @@ void check_task(const Task *task,
 {
   assert(regions.size() == 2);
   assert(task->regions.size() == 2);
-  assert(task->arglen == sizeof(T));
-  const T alpha = *((const T*)task->args);
+  assert(task->arglen == sizeof(TYPE));
+  const TYPE alpha = *((const TYPE*)task->args);
 
   const AccessorRO acc_x(regions[0], FID_X);
   const AccessorRO acc_y(regions[0], FID_Y);
@@ -465,8 +465,8 @@ void check_task(const Task *task,
 
   for (PointInRectIterator<1> pir(rect); pir(); pir++)
   {
-    T expected = alpha * acc_x[*pir] + acc_y[*pir];
-    T received = acc_z[*pir];
+    TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
+    TYPE received = acc_z[*pir];
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.

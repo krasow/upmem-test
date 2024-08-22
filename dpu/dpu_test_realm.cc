@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 extern "C" {
 #include <stdint.h>
 #include <defs.h>
@@ -59,8 +58,12 @@ int main_kernel1() {
     printf(" alpha = %f \n", args->alpha); 
   #endif
 
-    for (Legion::PointInRectIterator<1> pir(args->rect); pir(); pir++) {
-       args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
+    Rect<1> rect;
+    rect.lo = args->rect.lo + tasklet_id;
+    rect.hi = args->rect.hi;
+
+    for (Legion::PointInRectIterator<1> pir(rect); pir(); pir += NR_TASKLETS) {
+      args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
       //  printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
       //  printf("write %f\n",args->acc_z[*pir]);
     }

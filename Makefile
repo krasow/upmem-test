@@ -18,6 +18,8 @@ ifndef LG_RT_DIR
 $(error LG_RT_DIR variable is not defined, aborting build)
 endif
 
+TYPE=DOUBLE
+
 # Flags for directing the runtime makefile what to include
 DEBUG           ?= 1		# Include debugging symbols
 MAX_DIM         ?= 3		# Maximum number of dimensions
@@ -40,10 +42,10 @@ GEN_UPMEM_SRC ?= dpu/dpu_test_realm.cc  # .cc files for UPMEM source
 
 # You can modify these variables, some will be appended to by the runtime makefile
 INC_FLAGS	?= -Iinclude
-CC_FLAGS	?= -DINT32 -DLEGION_MAX_NUM_PROCS=128 #-DLEGION_SPY 
+CC_FLAGS	?= -D$(TYPE) -DLEGION_MAX_NUM_PROCS=128 #-DLEGION_SPY 
 NVCC_FLAGS	?=
 HIPCC_FLAGS ?=
-UPMEMCC_FLAGS ?= -DINT32 -DNR_TASKLETS=1
+UPMEMCC_FLAGS ?= -D$(TYPE) -DNR_TASKLETS=16
 GASNET_FLAGS  ?=
 LD_FLAGS	?=
 
