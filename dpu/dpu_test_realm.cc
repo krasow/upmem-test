@@ -1,3 +1,20 @@
+/* Copyright 2024 Stanford University, Los Alamos National Laboratory,
+ *                Northwestern University
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 extern "C" {
 #include <stdint.h>
 #include <defs.h>
@@ -6,29 +23,19 @@ extern "C" {
 #include <barrier.h>
 }
 
-#include <realm/upmem/realm_c_upmem.h>
+/* realm system library for UPMEM */
+#include <realm/upmem/realm_c_upmem.h> 
+/* common header between device and host */
+#include <common.h> 
 
-typedef enum DPU_LAUNCH_KERNELS{
-  test,
-  nr_kernels = 1
-} DPU_LAUNCH_KERNELS;
 
 typedef struct __DPU_LAUNCH_ARGS {
-    Rect<2> bounds;
-    AffineAccessor<int, 2> arrayA_accessor;
-    AffineAccessor<int, 2> arrayB_accessor;
-    AffineAccessor<int, 2> arrayC_accessor;
-    DPU_LAUNCH_KERNELS kernel;
-    PADDING(8);
+    char paddd[128];
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
 
-typedef struct DPU_LAUNCH_ARGS {
-    char paddd[128];
-} __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
+__host __DPU_LAUNCH_ARGS ARGS;  
 
-__host DPU_LAUNCH_ARGS ARGS;  
-
-__DPU_LAUNCH_ARGS* args = (__DPU_LAUNCH_ARGS*)(&ARGS);
+DPU_LAUNCH_ARGS* args = (DPU_LAUNCH_ARGS*)(&ARGS);
 
 int main_kernel1();
 
@@ -48,8 +55,8 @@ int main_kernel1() {
     }
 
     unsigned int row, column;
-    row = 32;
-    column = 32;
+    row = 64;
+    column = 64;
 
     unsigned total_size = row * column;
 
@@ -58,7 +65,7 @@ int main_kernel1() {
         unsigned int idx = index/column;
         unsigned int idy = index%column;
 
-        unsigned int sum = 0;
+        TYPE sum = 0;
 
         for(unsigned int k = 0; k<column; k++){
             unsigned int a = args->arrayA_accessor[Point<2>(idx, k)];
