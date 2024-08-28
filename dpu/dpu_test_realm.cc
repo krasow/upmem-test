@@ -28,6 +28,7 @@ extern "C" {
 /* common header between device and host */
 #include <common.h> 
 
+#define BLOCK_SIZE 8
 
 typedef struct __DPU_LAUNCH_ARGS {
     char paddd[128];
@@ -60,6 +61,9 @@ int main_kernel1() {
 
     unsigned total_size = row * column;
 
+
+    
+
     for(unsigned int index = tasklet_id; index < total_size; index += NR_TASKLETS){
 
         unsigned int idx = index/column;
@@ -68,8 +72,8 @@ int main_kernel1() {
         TYPE sum = 0;
 
         for(unsigned int k = 0; k<column; k++){
-            unsigned int a = args->arrayA_accessor[Point<2>(idx, k)];
-            unsigned int b = args->arrayB_accessor[Point<2>(k, idy)];
+            TYPE a = args->arrayA_accessor[Point<2>(idx, k)];
+            TYPE b = args->arrayB_accessor[Point<2>(k, idy)];
             sum += a*b;
         }
         args->arrayC_accessor.write(Point<2>(idx, idy), sum);
