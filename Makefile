@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-TYPE=DOUBLE
+TYPE=INT32
 
 ifndef LG_RT_DIR
 $(error LG_RT_DIR variable is not defined, aborting build)

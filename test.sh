@@ -1,5 +1,5 @@
 size=64
-type=double
+type=int32
 
 nice make -j 100
 

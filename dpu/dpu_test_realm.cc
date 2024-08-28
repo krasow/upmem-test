@@ -61,9 +61,6 @@ int main_kernel1() {
 
     unsigned total_size = row * column;
 
-
-    
-
     for(unsigned int index = tasklet_id; index < total_size; index += NR_TASKLETS){
 
         unsigned int idx = index/column;
@@ -71,12 +68,14 @@ int main_kernel1() {
 
         TYPE sum = 0;
 
-        for(unsigned int k = 0; k<column; k++){
-            TYPE a = args->arrayA_accessor[Point<2>(idx, k)];
-            TYPE b = args->arrayB_accessor[Point<2>(k, idy)];
+        for(unsigned int k = 0; k < column; k++){
+            // .read with true "single" arg will READ for mram a element at a time
+            TYPE a = args->arrayA_accessor.read(Point<2>(idx, k), true);
+            TYPE b = args->arrayB_accessor.read(Point<2>(k, idy), true);
             sum += a*b;
         }
-        args->arrayC_accessor.write(Point<2>(idx, idy), sum);
+        // .write with true "single" arg will WRITE for mram a element at a time
+        args->arrayC_accessor.write(Point<2>(idx, idy), sum, true);
     }  
 
     return 0;
