@@ -87,18 +87,10 @@ int main_kernel1() {
        pir += (NR_TASKLETS * BLOCK_SIZE)) {
 
     // read blocks to respective base pointers
-    mram_read((__mram_ptr void const *)((uintptr_t)DPU_MRAM_HEAP_POINTER +
-                                  (uintptr_t)(args->acc_x.accessor.ptr(*pir))),
-        (void *)(block_acc_x.accessor.base), BLOCK_SIZE * sizeof(TYPE));
-
-    mram_read((__mram_ptr void const *)((uintptr_t)DPU_MRAM_HEAP_POINTER +
-                                  (uintptr_t)(args->acc_y.accessor.ptr(*pir))),
-        (void *)(block_acc_y.accessor.base), BLOCK_SIZE * sizeof(TYPE));
-
-    mram_read((__mram_ptr void const *)((uintptr_t)DPU_MRAM_HEAP_POINTER +
-                                  (uintptr_t)(args->acc_z.accessor.ptr(*pir))),
-        (void *)(block_acc_z.accessor.base), BLOCK_SIZE * sizeof(TYPE));
-    
+    // #define READ_BLOCK(point, acc_full, acc_block, bytes)
+    READ_BLOCK(*pir, args->acc_x, block_acc_x, BLOCK_SIZE * sizeof(TYPE));
+    READ_BLOCK(*pir, args->acc_y, block_acc_y, BLOCK_SIZE * sizeof(TYPE));
+    READ_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
 
     Rect<1> block_rect;
     block_rect.lo = 0;
@@ -111,10 +103,8 @@ int main_kernel1() {
     }
 
     // write block 
-    mram_write((const void *)(block_acc_z.accessor.base),
-               (__mram_ptr void *)((uintptr_t)DPU_MRAM_HEAP_POINTER +
-                                   (uintptr_t)(args->acc_z.accessor.ptr(*pir))),
-               BLOCK_SIZE * sizeof(TYPE));
+    // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
+    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
   } 
   return 0;
 }
