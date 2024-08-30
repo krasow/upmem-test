@@ -17,6 +17,8 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+#define USE_LEGION
+
 /* Brings in headers to define accessors */
 #include <realm/upmem/upmem_common.h>
 
