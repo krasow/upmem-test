@@ -20,6 +20,10 @@
 /* Brings in headers to define accessors */
 #include <realm/upmem/upmem_common.h>
 
+#define WIDTH 32
+#define HEIGHT 32
+
+
 typedef FieldAccessor<LEGION_READ_ONLY,TYPE,1,coord_t,
                       Realm::AffineAccessor<TYPE,1,coord_t> > AccessorRO;
 typedef FieldAccessor<LEGION_WRITE_DISCARD,TYPE,1,coord_t,
@@ -33,6 +37,8 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 
 typedef struct DPU_LAUNCH_ARGS{
+  size_t width;
+  size_t height;
   TYPE alpha;
   Rect<1> rect;
   AccessorRO acc_y;

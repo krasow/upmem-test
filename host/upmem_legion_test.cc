@@ -102,7 +102,7 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = 262144;
+  int num_elements = 32*32;
   int num_subregions = 32;
   int soa_flag = 0;
   // See if we have any command line arguments to parse
@@ -423,13 +423,19 @@ void daxpy_task(const Task *task,
   printf("Running daxpy computation for point %d, xptr %p, y_ptr %p, z_ptr %p...", 
           point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
   #ifdef INT32
+    // printf("Running daxpy computation for point %d, xptr %p, y_ptr %p, z_ptr %p...", 
+    //         point, *acc_x.ptr(rect.lo), *acc_y.ptr(rect.lo), *acc_z.ptr(rect.lo));
     printf(" alpha = %d \n", alpha); 
   #elif DOUBLE
+  // printf("Running daxpy computation for point %d, xptr %f, y_ptr %f, z_ptr %f...", 
+  //           point, *acc_x.ptr(rect.lo), *acc_y.ptr(rect.lo), *acc_z.ptr(rect.lo));
     printf(" alpha = %f \n", alpha); 
   #endif
   
   {
     DPU_LAUNCH_ARGS args;
+    args.width = WIDTH;
+    args.height = HEIGHT;
     args.alpha = alpha;
     args.rect = rect;
     args.acc_y = acc_y;

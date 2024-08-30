@@ -62,11 +62,36 @@ int main_kernel1() {
     rect.lo = args->rect.lo + tasklet_id;
     rect.hi = args->rect.hi;
 
-    for (Legion::PointInRectIterator<1> pir(rect); pir(); pir += NR_TASKLETS) {
-      args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
-      //  printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
-      //  printf("write %f\n",args->acc_z[*pir]);
+    Rect<1> rect_z;
+    rect_z.lo = 0;
+    rect_z.hi = args->width;
+
+    size_t cnt = 0;
+    for(Legion::PointInRectIterator<1> pir_z(rect); pir_z(); pir_z += NR_TASKLETS){
+      rect.lo = args->rect.lo + cnt;
+      rect.hi = args->rect.hi;
+      auto sum = args->alpha;
+      sum -= args->alpha;
+      Rect<1> rect_y;
+      rect_y.lo = 0;
+      rect_y.hi = args->height;
+      Legion::PointInRectIterator<1> pir_y(rect_y);
+      for (Legion::PointInRectIterator<1> pir(rect); pir(); pir+= args->height) {
+        sum += args->acc_x[*pir] * args->acc_y[*pir_y];
+        // args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
+        //  printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
+        //  printf("write %f\n",args->acc_z[*pir]);
+        pir_y++;
+      }
+      args->acc_z.write(*pir_z, sum);
+      cnt+=NR_TASKLETS;
     }
+
+    // for (Legion::PointInRectIterator<1> pir(rect); pir(); pir += NR_TASKLETS) {
+    //   args->acc_z.write(*pir, args->alpha * args->acc_x[*pir] + args->acc_y[*pir]); 
+    //   //  printf("read %f,\t",args->alpha * args->acc_x[*pir] + args->acc_y[*pir]);
+    //   //  printf("write %f\n",args->acc_z[*pir]);
+    // }
 
     return 0;
 }
