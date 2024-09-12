@@ -68,8 +68,8 @@ int main_kernel1() {
   rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE;
   rect.hi = args->rect.hi;
 
-  AccessorRO block_acc_x;
   AccessorRO block_acc_y;
+  AccessorRO block_acc_x;
   AccessorWD block_acc_z;
 
   // set base pointer for the new block accessors

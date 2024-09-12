@@ -94,9 +94,12 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = 32*32;
+  int num_elements = 262144;
   int num_subregions = 32;
   int soa_flag = 0;
+
+  int width = 32;
+  int height = 32;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies
   // how many subregions we should make.
@@ -109,9 +112,13 @@ void top_level_task(const Task *task,
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
         soa_flag = atoi(command_args.argv[++i]);
+      if (!strcmp(command_args.argv[i], "-w"))
+        width = atoi(command_args.argv[++i]);
+      if (!strcmp(command_args.argv[i], "-h"))
+        height = atoi(command_args.argv[++i]); 
     }
   }
-  printf("Running daxpy for %d elements...\n", num_elements);
+  printf("Running mat multiplication for %d elements...\n", num_elements);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
 
   // Create our logical regions using the same schemas as earlier examples
@@ -148,6 +155,21 @@ void top_level_task(const Task *task,
       xy_ptr[num_elements + j] = RANDOM_NUMBER;
       z_ptr[j] = RANDOM_NUMBER;
     }
+    // printf("printing the matrix x\n");
+    // for(int m = 0; m<width; m++){
+    //   for(int n=0; n<height; n++){
+    //     printf("%f ", (double)xy_ptr[m*n]);
+    //   }
+    //   printf("\n");
+    // }
+    // printf("printing the matrix y\n");
+    // for(int m = 0; m<width; m++){
+    //   for(int n=0; n<height; n++){
+    //     printf("%f ", (double)xy_ptr[m*n+num_elements]);
+    //   }
+    //   printf("\n");
+    // }
+    
     {
       printf("Attach SOA array fid %d, fid %d, ptr %p\n", FID_X, FID_Y, xy_ptr);
       AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr, input_lr);
@@ -337,7 +359,7 @@ void top_level_task(const Task *task,
   FutureMap fm = runtime->execute_index_space(ctx, daxpy_launcher);
   fm.wait_all_results();
   double end_t = get_cur_time();
-  printf("Attach array, daxpy done, time %f\n", end_t - start_t);
+  printf("Attach array, mat multiplication done, time %f\n", end_t - start_t);
 
   // While we could also issue parallel subtasks for the checking
   // task, we only issue a single task launch to illustrate an
@@ -421,8 +443,8 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
 
   {
     DPU_LAUNCH_ARGS args;
-    args.width = WIDTH;
-    args.height = HEIGHT;
+    // args.width = WIDTH;
+    // args.height = HEIGHT;
     args.alpha = alpha;
     args.rect = rect;
     args.acc_y = acc_y;

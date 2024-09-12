@@ -39,8 +39,8 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 
 typedef struct DPU_LAUNCH_ARGS{
-  size_t width;
-  size_t height;
+  // size_t width;
+  // size_t height;
   TYPE alpha;
   Rect<1> rect;
   AccessorRO acc_y;
