@@ -5,3 +5,4 @@ upmem_test
 *.so
 *.png
 *.bin
+test_func*
