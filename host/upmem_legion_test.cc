@@ -94,12 +94,12 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = 262144;
+  int num_elements = WIDTH*HEIGHT;
   int num_subregions = 32;
   int soa_flag = 0;
 
-  int width = 32;
-  int height = 32;
+  // int width = 32;
+  // int height = 32;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies
   // how many subregions we should make.
@@ -112,10 +112,10 @@ void top_level_task(const Task *task,
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
         soa_flag = atoi(command_args.argv[++i]);
-      if (!strcmp(command_args.argv[i], "-w"))
-        width = atoi(command_args.argv[++i]);
-      if (!strcmp(command_args.argv[i], "-h"))
-        height = atoi(command_args.argv[++i]); 
+      // if (!strcmp(command_args.argv[i], "-w"))
+      //   width = atoi(command_args.argv[++i]);
+      // if (!strcmp(command_args.argv[i], "-h"))
+      //   height = atoi(command_args.argv[++i]); 
     }
   }
   printf("Running mat multiplication for %d elements...\n", num_elements);
@@ -151,21 +151,21 @@ void top_level_task(const Task *task,
     size_t z_bytes = sizeof(TYPE) * (num_elements);
     z_ptr = (TYPE *)malloc(z_bytes);
     for (int j = 0; j < num_elements; j++) {
-      xy_ptr[j] = RANDOM_NUMBER;
-      xy_ptr[num_elements + j] = RANDOM_NUMBER;
-      z_ptr[j] = RANDOM_NUMBER;
+      xy_ptr[j] = 1;
+      xy_ptr[num_elements + j] = 1;
+      z_ptr[j] = 1;
     }
     // printf("printing the matrix x\n");
-    // for(int m = 0; m<width; m++){
-    //   for(int n=0; n<height; n++){
-    //     printf("%f ", (double)xy_ptr[m*n]);
+    // for(int m = 0; m<HEIGHT; m++){
+    //   for(int n=0; n<WIDTH; n++){
+    //     printf("%f ", xy_ptr[m*WIDTH + n]);
     //   }
     //   printf("\n");
     // }
     // printf("printing the matrix y\n");
-    // for(int m = 0; m<width; m++){
-    //   for(int n=0; n<height; n++){
-    //     printf("%f ", (double)xy_ptr[m*n+num_elements]);
+    // for(int m = 0; m<HEIGHT; m++){
+    //   for(int n=0; n<WIDTH; n++){
+    //     printf("%f ", xy_ptr[m*WIDTH + n+num_elements]);
     //   }
     //   printf("\n");
     // }
@@ -476,9 +476,19 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   size_t count = 0;
   size_t errors = 0;
 
-  for (PointInRectIterator<1> pir(rect); pir(); pir++) {
-    TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
+  for (PointInRectIterator<1> pir(rect); pir(); ) {
     TYPE received = acc_z[*pir];
+    TYPE expected = 0;
+    for(int i=0; i<WIDTH; i++){
+      // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
+
+      expected += acc_x[*pir] * acc_y[*pir];
+      pir++;
+      count++;
+    }    
+
+
+    // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.
@@ -488,7 +498,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
       printf("location: %ld\n", count);
       errors++;
     }
-    count++;
+    // count+=32;
   }
   if (all_passed)
     printf("SUCCESS!\n");

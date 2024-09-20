@@ -27,10 +27,10 @@ extern "C" {
 /* common header between device and host */
 #include <common.h>
 
-#define BLOCK_SIZE 64
+#define BLOCK_SIZE 1
 
 typedef struct __DPU_LAUNCH_ARGS {
-  char paddd[256];
+  char paddd[512];
 } __attribute__((aligned(8))) __DPU_LAUNCH_ARGS;
 
 __host __DPU_LAUNCH_ARGS ARGS;
@@ -65,7 +65,7 @@ int main_kernel1() {
 #endif
 
   Rect<1> rect;
-  rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE;
+  rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE * WIDTH;
   rect.hi = args->rect.hi;
 
   AccessorRO block_acc_y;
@@ -73,38 +73,48 @@ int main_kernel1() {
   AccessorWD block_acc_z;
 
   // set base pointer for the new block accessors
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
-  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
   block_acc_z.accessor.strides = args->acc_z.accessor.strides;
 
   // iterator through all elements
+
+  int counter = 0;
   for (Legion::PointInRectIterator<1> pir(rect); pir();
-       pir += (NR_TASKLETS * BLOCK_SIZE)) {
+       pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
 
     // read blocks to respective base pointers
-    // #define READ_BLOCK(point, acc_full, acc_block, bytes)
-    READ_BLOCK(*pir, args->acc_x, block_acc_x, BLOCK_SIZE * sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_y, block_acc_y, BLOCK_SIZE * sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
+    // #define READ_BLOCK(point, acc_full, acc_block, bytes)  
+
+    READ_BLOCK(*pir, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+    READ_BLOCK(*pir, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+    READ_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
     Rect<1> block_rect;
     block_rect.lo = 0;
-    block_rect.hi = BLOCK_SIZE;
+    block_rect.hi = WIDTH-1;
 
+    TYPE sum=0;
     // block iterator
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
+      // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+
+      sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
       block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
                                         block_acc_y[*pir_block]);
     }
-
+    Legion::PointInRectIterator<1> pir_block(block_rect);
+    block_acc_z.write(*pir_block, sum);
     // write block
     // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
-    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
+    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE * sizeof(TYPE));
+
+    counter++;
   }
   return 0;
 }
