@@ -75,7 +75,7 @@ int main_kernel1() {
   // set base pointer for the new block accessors
   block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
@@ -84,37 +84,78 @@ int main_kernel1() {
   // iterator through all elements
 
   int counter = 0;
-  for (Legion::PointInRectIterator<1> pir(rect); pir();
-       pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
+  unsigned int index = tasklet_id;
 
-    // read blocks to respective base pointers
-    // #define READ_BLOCK(point, acc_full, acc_block, bytes)  
+  unsigned int total_ele = WIDTH * HEIGHT;
 
-    READ_BLOCK(*pir, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  for(; index<total_ele; index +=NR_TASKLETS){
+
+    unsigned int row = index/WIDTH;
+    unsigned int col = index%WIDTH;
+    Legion::PointInRectIterator<1> pir_a(rect);
+    Legion::PointInRectIterator<1> pir_b(rect);
+    Legion::PointInRectIterator<1> pir_z(rect);
+
+    pir_a += row*WIDTH;
+    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+    pir_b += col*WIDTH;
+    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
     Rect<1> block_rect;
     block_rect.lo = 0;
     block_rect.hi = WIDTH-1;
-
     TYPE sum=0;
-    // block iterator
+
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
       // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
 
       sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
-      block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-                                        block_acc_y[*pir_block]);
+      // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+      //                                   block_acc_y[*pir_block]);
     }
+    block_rect.lo = 0;
+    block_rect.hi = 0;
     Legion::PointInRectIterator<1> pir_block(block_rect);
     block_acc_z.write(*pir_block, sum);
-    // write block
-    // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
-    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE * sizeof(TYPE));
 
-    counter++;
+    pir_z += index;
+
+    WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
   }
+
+  // for (Legion::PointInRectIterator<1> pir(rect); pir();
+  //      pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
+
+  //   // read blocks to respective base pointers
+  //   // #define READ_BLOCK(point, acc_full, acc_block, bytes)  
+
+  //   READ_BLOCK(*pir, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   READ_BLOCK(*pir, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   READ_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+  //   Rect<1> block_rect;
+  //   block_rect.lo = 0;
+  //   block_rect.hi = WIDTH-1;
+
+  //   TYPE sum=0;
+  //   // block iterator
+  //   for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
+  //        pir_block++) {
+  //     // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+
+  //     sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+  //     block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+  //                                       block_acc_y[*pir_block]);
+  //   }
+  //   Legion::PointInRectIterator<1> pir_block(block_rect);
+  //   block_acc_z.write(*pir_block, sum);
+  //   // write block
+  //   // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
+  //   WRITE_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE * sizeof(TYPE));
+
+  //   counter++;
+  // }
   return 0;
 }
