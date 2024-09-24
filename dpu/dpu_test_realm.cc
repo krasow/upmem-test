@@ -51,7 +51,7 @@ int main_kernel1() {
 
 #ifdef PRINT_UPMEM
   if (tasklet_id == 0) {
-    printf("DEVICE:::: Running daxpy computation with xptr %p, y_ptr %p, z_ptr "
+    printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
            "%p...",
            args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
            args->acc_z.ptr(args->rect.lo));
@@ -65,7 +65,7 @@ int main_kernel1() {
 #endif
 
   Rect<1> rect;
-  rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE * WIDTH;
+  rect.lo = args->rect.lo;
   rect.hi = args->rect.hi;
 
   AccessorRO block_acc_y;
@@ -115,6 +115,8 @@ int main_kernel1() {
       // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
       //                                   block_acc_y[*pir_block]);
     }
+
+    // printf("sum of tasklet \n");
     block_rect.lo = 0;
     block_rect.hi = 0;
     Legion::PointInRectIterator<1> pir_block(block_rect);

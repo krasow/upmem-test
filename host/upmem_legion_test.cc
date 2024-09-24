@@ -433,7 +433,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
   printf(
-      "Running daxpy computation for point %d, xptr %p, y_ptr %p, z_ptr %p...",
+      "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
       point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
 #ifdef INT32
   printf(" alpha = %d \n", alpha);
@@ -499,18 +499,18 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
       pir_y++;
       // count++;
     }    
-    PRINT_EXPECTED(expected, received);
-    printf("location: %ld\n", count);
+    // PRINT_EXPECTED(expected, received);
+    // printf("location: %ld\n", count);
     // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.
-    // if (!COMPARE(expected, received)) {
-    //   all_passed = false;
-    //   PRINT_EXPECTED(expected, received);
-    //   printf("location: %ld\n", count);
-    //   errors++;
-    // }
+    if (!COMPARE(expected, received)) {
+      all_passed = false;
+      PRINT_EXPECTED(expected, received);
+      printf("location: %ld\n", count);
+      errors++;
+    }
     count++;
     // count+=32;
   }
