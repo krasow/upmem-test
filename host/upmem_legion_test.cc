@@ -122,7 +122,10 @@ void top_level_task(const Task *task,
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
 
   // Create our logical regions using the same schemas as earlier examples
-  Rect<1> elem_rect(0, num_elements - 1);
+  Rect<2> elem_rect(Point<2>(0,0), Point<2>(num_elements - 1, num_elements - 1));
+
+  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[0], elem_rect.hi.values[0]);
+  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[1], elem_rect.hi.values[1]);
   IndexSpace is = runtime->create_index_space(ctx, elem_rect);
   runtime->attach_name(is, "is");
   FieldSpace fs = runtime->create_field_space(ctx);
@@ -146,11 +149,11 @@ void top_level_task(const Task *task,
   TYPE *xy_ptr = NULL;
   TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) { // SOA
-    size_t xy_bytes = 2 * sizeof(TYPE) * (num_elements);
+    size_t xy_bytes = 2* sizeof(TYPE) * (num_elements * num_elements);
     xy_ptr = (TYPE *)malloc(xy_bytes);
-    size_t z_bytes = sizeof(TYPE) * (num_elements);
+    size_t z_bytes = sizeof(TYPE) * (num_elements * num_elements);
     z_ptr = (TYPE *)malloc(z_bytes);
-    for (int j = 0; j < num_elements; j++) {
+    for (int j = 0; j < num_elements * num_elements; j++) {
       xy_ptr[j] = 1;
       xy_ptr[num_elements + j] = 1;
       z_ptr[j] = 1;
@@ -198,7 +201,7 @@ void top_level_task(const Task *task,
       z_pr = runtime->attach_external_resource(ctx, launcher);
     }
   } else { // AOS
-    size_t total_bytes = sizeof(daxpy_t) * (num_elements);
+    size_t total_bytes = sizeof(daxpy_t) * (num_elements * num_elements);
     daxpy_t *xyz_ptr = (daxpy_t *)malloc(total_bytes);
     std::vector<FieldID> layout_constraint_fields(3);
     layout_constraint_fields[0] = FID_X;
@@ -236,7 +239,7 @@ void top_level_task(const Task *task,
   // want to create.  Each subregion is assigned a 'color' which is why
   // we name the variables 'color_bounds' and 'color_domain'.  We'll use
   // these below when we partition the region.
-  Rect<1> color_bounds(0, num_subregions - 1);
+  Rect<2> color_bounds(Point<2>(0,0), Point<2>(num_elements - 1, num_elements - 1));
   IndexSpace color_is = runtime->create_index_space(ctx, color_bounds);
 
   // Parallelism in Legion is implicit.  This means that rather than
@@ -411,10 +414,20 @@ void init_field_task(const Task *task,
   // Note here that we get the domain for the subregion for
   // this task from the runtime which makes it safe for running
   // both as a single task and as part of an index space of tasks.
-  Rect<1> rect = runtime->get_index_space_domain(
+  Rect<2> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
-  for (PointInRectIterator<1> pir(rect); pir(); pir++)
+  printf("before\n");
+
+  printf(" val0 %lld val1 %lld\n", rect.lo.values[0], rect.hi.values[0]);
+  printf(" val0 %lld val1 %lld\n", rect.lo.values[1], rect.hi.values[1]);
+  
+  for (PointInRectIterator<2> pir(rect); pir(); pir++) {
+    printf("foooooo\n");
     acc[*pir] = RANDOM_NUMBER;
+  }
+
+  printf("after\n");
+  
 }
 
 void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
@@ -430,7 +443,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   const AccessorRO acc_x(regions[0], FID_X);
   const AccessorWD acc_z(regions[1], FID_Z);
 
-  Rect<1> rect = runtime->get_index_space_domain(
+  Rect<2> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
   printf(
       "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
@@ -467,7 +480,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   const AccessorRO acc_y(regions[0], FID_Y);
   const AccessorRO acc_z(regions[1], FID_Z);
 
-  Rect<1> rect = runtime->get_index_space_domain(
+  Rect<2> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
   const void *ptr = acc_z.ptr(rect.lo);
   printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
@@ -476,15 +489,15 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   size_t count = 0;
   size_t errors = 0;
 
-  for (PointInRectIterator<1> pir(rect); pir(); pir++) {
+  for (PointInRectIterator<2> pir(rect); pir(); pir++) {
     TYPE received = acc_z[*pir];
     TYPE expected = 0;
 
     int row = count / WIDTH;
     int col = count % WIDTH;
 
-    PointInRectIterator<1> pir_x(rect);
-    PointInRectIterator<1> pir_y(rect);
+    PointInRectIterator<2> pir_x(rect);
+    PointInRectIterator<2> pir_y(rect);
 
     for(int i=0; i<row*WIDTH; i++) pir_x++;
     for(int i=0; i<col*HEIGHT; i++) pir_y++;

@@ -75,7 +75,7 @@ int main_kernel1() {
   // set base pointer for the new block accessors
   block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
+  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
@@ -109,18 +109,18 @@ int main_kernel1() {
 
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
-      // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
 
       sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
       // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
       //                                   block_acc_y[*pir_block]);
     }
 
-    // printf("sum of tasklet \n");
+    printf("sum of tasklet \n");
     block_rect.lo = 0;
     block_rect.hi = 0;
     Legion::PointInRectIterator<1> pir_block(block_rect);
-    block_acc_z.write(*pir_block, sum);
+    block_acc_z.write(*pir_block, me());
 
     pir_z += index;
 
