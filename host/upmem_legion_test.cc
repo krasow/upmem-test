@@ -200,7 +200,7 @@ void top_level_task(const Task *task,
       printf("Attach SOA array fid %d, ptr %p\n", FID_Y, y_ptr);
       AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr_Y, input_lr_Y);
       std::vector<FieldID> attach_fields(1);
-      attach_fields[0] = FID_X;
+      attach_fields[0] = FID_Y;
       launcher.initialize_constraints(false /*column major*/, true /*soa*/,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
