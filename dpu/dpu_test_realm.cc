@@ -28,6 +28,7 @@ extern "C" {
 #include <common.h>
 
 #define BLOCK_SIZE 1
+#define NUM_SUBREGIONS 2
 
 typedef struct __DPU_LAUNCH_ARGS {
   char paddd[512];
@@ -68,6 +69,18 @@ int main_kernel1() {
   rect.lo = args->rect.lo;
   rect.hi = args->rect.hi;
 
+  unsigned int index = rect.lo.value;
+  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
+  unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
+  unsigned int subregion_index = index/subregion_size;
+  unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
+  unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+  unsigned int end_row = start_row + subregion_height - 1;
+  unsigned int end_col = start_col + subregion_width - 1;
+
+
+
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
   AccessorWD block_acc_z;
@@ -83,30 +96,28 @@ int main_kernel1() {
 
   // iterator through all elements
 
-  int counter = 0;
-  unsigned int index = tasklet_id;
+  // int counter = 0;
 
-  unsigned int total_ele = WIDTH * HEIGHT;
-
-  for(; index<total_ele; index +=NR_TASKLETS){
-
-    unsigned int row = index/WIDTH;
-    unsigned int col = index%WIDTH;
-    Legion::PointInRectIterator<1> pir_a(rect);
-    Legion::PointInRectIterator<1> pir_b(rect);
+  unsigned int curr_row = start_row + tasklet_id/subregion_width;
+  unsigned int curr_col = start_col + tasklet_id%subregion_width;
+  for(unsigned int counter = tasklet_id; counter < subregion_size; counter += NR_TASKLETS){
+    //read data
+    Rect<1> temp_rect;
+    temp_rect.lo = 0;
+    temp_rect.hi = WIDTH*HEIGHT;
+    Legion::PointInRectIterator<1> pir_a(temp_rect);
+    Legion::PointInRectIterator<1> pir_b(temp_rect);
     Legion::PointInRectIterator<1> pir_z(rect);
-
-    pir_a += row*WIDTH;
+    pir_a += curr_row*WIDTH;
+    pir_b += curr_col*WIDTH;
     READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-
-    pir_b += col*WIDTH;
     READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
+    //calculation
     Rect<1> block_rect;
     block_rect.lo = 0;
     block_rect.hi = WIDTH-1;
     TYPE sum=0;
-
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
       // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
@@ -116,16 +127,62 @@ int main_kernel1() {
       //                                   block_acc_y[*pir_block]);
     }
 
-    // printf("sum of tasklet \n");
+    //write data into temp block
     block_rect.lo = 0;
     block_rect.hi = 0;
     Legion::PointInRectIterator<1> pir_block(block_rect);
     block_acc_z.write(*pir_block, sum);
 
-    pir_z += index;
-
+    //write data into accessor
+    pir_z+=counter;
     WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
+
+
+    curr_row += NR_TASKLETS/subregion_width;;
+    curr_col += NR_TASKLETS%subregion_width;
   }
+  // unsigned int index = tasklet_id;
+
+  // unsigned int total_ele = WIDTH * HEIGHT;
+
+  // for(; index<total_ele; index +=NR_TASKLETS){
+
+  //   unsigned int row = index/WIDTH;
+  //   unsigned int col = index%WIDTH;
+  //   Legion::PointInRectIterator<1> pir_a(rect);
+  //   Legion::PointInRectIterator<1> pir_b(rect);
+  //   Legion::PointInRectIterator<1> pir_z(rect);
+
+  //   pir_a += row*WIDTH;
+  //   READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+  //   pir_b += col*WIDTH;
+  //   READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+  //   Rect<1> block_rect;
+  //   block_rect.lo = 0;
+  //   block_rect.hi = WIDTH-1;
+  //   TYPE sum=0;
+
+  //   for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
+  //        pir_block++) {
+  //     // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+
+  //     sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+  //     // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+  //     //                                   block_acc_y[*pir_block]);
+  //   }
+
+  //   // printf("sum of tasklet \n");
+  //   block_rect.lo = 0;
+  //   block_rect.hi = 0;
+  //   Legion::PointInRectIterator<1> pir_block(block_rect);
+  //   block_acc_z.write(*pir_block, sum);
+
+  //   pir_z += index;
+
+  //   WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
+  // }
 
   // for (Legion::PointInRectIterator<1> pir(rect); pir();
   //      pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
