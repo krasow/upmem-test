@@ -94,7 +94,7 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = WIDTH*HEIGHT;
+  int elems_width = WIDTH;
   int num_subregions = 32;
   int soa_flag = 0;
 
@@ -107,7 +107,7 @@ void top_level_task(const Task *task,
     const InputArgs &command_args = Runtime::get_input_args();
     for (int i = 1; i < command_args.argc; i++) {
       if (!strcmp(command_args.argv[i], "-n"))
-        num_elements = atoi(command_args.argv[++i]);
+        elems_width = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-b"))
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
@@ -118,11 +118,11 @@ void top_level_task(const Task *task,
       //   height = atoi(command_args.argv[++i]); 
     }
   }
-  printf("Running mat multiplication for %d elements...\n", num_elements);
+  printf("Running mat multiplication for %d elements...\n", elems_width);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
 
   // Create our logical regions using the same schemas as earlier examples
-  Rect<2> elem_rect(Point<2>(0,0), Point<2>(num_elements - 1, num_elements - 1));
+  Rect<2> elem_rect(Point<2>(0,0), Point<2>(elems_width - 1, elems_width - 1));
 
   printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[0], elem_rect.hi.values[0]);
   printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[1], elem_rect.hi.values[1]);
@@ -149,13 +149,13 @@ void top_level_task(const Task *task,
   TYPE *xy_ptr = NULL;
   TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) { // SOA
-    size_t xy_bytes = 2* sizeof(TYPE) * (num_elements * num_elements);
+    size_t xy_bytes = 2* sizeof(TYPE) * (elems_width * elems_width);
     xy_ptr = (TYPE *)malloc(xy_bytes);
-    size_t z_bytes = sizeof(TYPE) * (num_elements * num_elements);
+    size_t z_bytes = sizeof(TYPE) * (elems_width * elems_width);
     z_ptr = (TYPE *)malloc(z_bytes);
-    for (int j = 0; j < num_elements * num_elements; j++) {
+    for (int j = 0; j < elems_width * elems_width; j++) {
       xy_ptr[j] = 1;
-      xy_ptr[num_elements + j] = 1;
+      xy_ptr[elems_width + j] = 1;
       z_ptr[j] = 1;
     }
     // printf("printing the matrix x\n");
@@ -168,7 +168,7 @@ void top_level_task(const Task *task,
     // printf("printing the matrix y\n");
     // for(int m = 0; m<HEIGHT; m++){
     //   for(int n=0; n<WIDTH; n++){
-    //     printf("%f ", xy_ptr[m*WIDTH + n+num_elements]);
+    //     printf("%f ", xy_ptr[m*WIDTH + n+elems_width]);
     //   }
     //   printf("\n");
     // }
@@ -201,7 +201,7 @@ void top_level_task(const Task *task,
       z_pr = runtime->attach_external_resource(ctx, launcher);
     }
   } else { // AOS
-    size_t total_bytes = sizeof(daxpy_t) * (num_elements * num_elements);
+    size_t total_bytes = sizeof(daxpy_t) * (elems_width * elems_width);
     daxpy_t *xyz_ptr = (daxpy_t *)malloc(total_bytes);
     std::vector<FieldID> layout_constraint_fields(3);
     layout_constraint_fields[0] = FID_X;
@@ -239,7 +239,7 @@ void top_level_task(const Task *task,
   // want to create.  Each subregion is assigned a 'color' which is why
   // we name the variables 'color_bounds' and 'color_domain'.  We'll use
   // these below when we partition the region.
-  Rect<2> color_bounds(Point<2>(0,0), Point<2>(num_elements - 1, num_elements - 1));
+  Rect<2> color_bounds(Point<2>(0,0), Point<2>(num_subregions - 1, num_subregions - 1));
   IndexSpace color_is = runtime->create_index_space(ctx, color_bounds);
 
   // Parallelism in Legion is implicit.  This means that rather than
@@ -416,17 +416,10 @@ void init_field_task(const Task *task,
   // both as a single task and as part of an index space of tasks.
   Rect<2> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
-  printf("before\n");
-
-  printf(" val0 %lld val1 %lld\n", rect.lo.values[0], rect.hi.values[0]);
-  printf(" val0 %lld val1 %lld\n", rect.lo.values[1], rect.hi.values[1]);
-  
+      
   for (PointInRectIterator<2> pir(rect); pir(); pir++) {
-    printf("foooooo\n");
     acc[*pir] = RANDOM_NUMBER;
   }
-
-  printf("after\n");
   
 }
 
