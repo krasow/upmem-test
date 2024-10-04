@@ -28,7 +28,7 @@ extern "C" {
 #include <common.h>
 
 #define BLOCK_SIZE 1
-#define NUM_SUBREGIONS 2
+// #define NUM_SUBREGIONS 2
 
 typedef struct __DPU_LAUNCH_ARGS {
   char paddd[512];
@@ -99,7 +99,7 @@ int main_kernel1() {
   // int counter = 0;
 
   unsigned int curr_row = start_row + tasklet_id/subregion_width;
-  unsigned int curr_col = start_col + tasklet_id%subregion_width;
+  unsigned int curr_col = tasklet_id%subregion_width;
   for(unsigned int counter = tasklet_id; counter < subregion_size; counter += NR_TASKLETS){
     //read data
     Rect<1> temp_rect;
@@ -109,7 +109,7 @@ int main_kernel1() {
     Legion::PointInRectIterator<1> pir_b(temp_rect);
     Legion::PointInRectIterator<1> pir_z(rect);
     pir_a += curr_row*WIDTH;
-    pir_b += curr_col*WIDTH;
+    pir_b += (curr_col+start_col)*WIDTH;
     READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
     READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
@@ -138,8 +138,9 @@ int main_kernel1() {
     WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
 
 
-    curr_row += NR_TASKLETS/subregion_width;;
-    curr_col += NR_TASKLETS%subregion_width;
+    curr_row += NR_TASKLETS/subregion_width;
+    curr_col += NR_TASKLETS;
+    curr_col %= subregion_width;
   }
   // unsigned int index = tasklet_id;
 

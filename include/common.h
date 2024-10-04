@@ -24,7 +24,7 @@
 
 #define WIDTH 16
 #define HEIGHT 16
-
+#define NUM_SUBREGIONS 2
 
 typedef FieldAccessor<LEGION_READ_ONLY,TYPE,1,coord_t,
                       Realm::AffineAccessor<TYPE,1,coord_t> > AccessorRO;

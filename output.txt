@@ -1,12 +1,151 @@
 Running with 16 Tasklets per DPU
 Running mat multiplication for 256 elements...
-Partitioning data into 1 sub-regions...
-Attach SOA array fid 0, fid 1, ptr 0x7f9a980057c0
-Attach SOA array fid 2, ptr 0x7f9a980067d0
+Partitioning data into 2 sub-regions...
+Attach SOA array fid 0, ptr 0x7fd40400ae40
+Attach SOA array fid 1, ptr 0x7fd40400b650
+Attach SOA array fid 2, ptr 0x7fd40400be60
 Initializing field 0 for block 0...
+Initializing field 0 for block 1...
 Initializing field 1 for block 0...
-Attach array, init done, time 0.065458
-Running mat multipilication for point 0, xptr 0x147b08, y_ptr 0x148308, z_ptr 0x14a308... alpha = 0.927290 
-Attach array, mat multiplication done, time 1.459592
-Checking results... xptr 0x7f9ae051dca0, y_ptr 0x7f9ae051e4a0, z_ptr 0x7f9ae05204a0...
-SUCCESS!
+Initializing field 1 for block 1...
+Attach array, init done, time 0.064627
+Running mat multipilication for point 0, xptr 0x147b08, y_ptr 0x148308, z_ptr 0x148b08... alpha = 0.927290 
+Running mat multipilication for point 1, xptr 0x147d08, y_ptr 0x148508, z_ptr 0x148d08... alpha = 0.927290 
+Attach array, mat multiplication done, time 0.268816
+Checking results... xptr 0x7fd45051cca0, y_ptr 0x7fd45051d4a0, z_ptr 0x7fd45051dca0...
+expected 3.916970, received 0.000000 --> location: 64
+expected 4.688234, received 0.000000 --> location: 65
+expected 3.237451, received 0.000000 --> location: 66
+expected 3.183695, received 0.000000 --> location: 67
+expected 4.559630, received 0.000000 --> location: 68
+expected 3.683108, received 0.000000 --> location: 69
+expected 4.298921, received 0.000000 --> location: 70
+expected 3.153072, received 0.000000 --> location: 71
+expected 3.496224, received 0.000000 --> location: 72
+expected 4.439124, received 0.000000 --> location: 73
+expected 3.326631, received 0.000000 --> location: 74
+expected 3.199247, received 0.000000 --> location: 75
+expected 4.597167, received 0.000000 --> location: 76
+expected 4.185322, received 0.000000 --> location: 77
+expected 3.887769, received 0.000000 --> location: 78
+expected 3.688022, received 0.000000 --> location: 79
+expected 3.842509, received 0.000000 --> location: 80
+expected 3.904622, received 0.000000 --> location: 81
+expected 3.698603, received 0.000000 --> location: 82
+expected 3.558710, received 0.000000 --> location: 83
+expected 5.242885, received 0.000000 --> location: 84
+expected 4.235936, received 0.000000 --> location: 85
+expected 4.460296, received 0.000000 --> location: 86
+expected 4.400184, received 0.000000 --> location: 87
+expected 4.184269, received 0.000000 --> location: 88
+expected 5.154240, received 0.000000 --> location: 89
+expected 3.635983, received 0.000000 --> location: 90
+expected 3.647991, received 0.000000 --> location: 91
+expected 6.066654, received 0.000000 --> location: 92
+expected 5.238822, received 0.000000 --> location: 93
+expected 5.464301, received 0.000000 --> location: 94
+expected 5.064748, received 0.000000 --> location: 95
+expected 4.418588, received 0.000000 --> location: 96
+expected 5.187235, received 0.000000 --> location: 97
+expected 4.044692, received 0.000000 --> location: 98
+expected 3.657778, received 0.000000 --> location: 99
+expected 5.607679, received 0.000000 --> location: 100
+expected 4.045358, received 0.000000 --> location: 101
+expected 4.794049, received 0.000000 --> location: 102
+expected 4.972311, received 0.000000 --> location: 103
+expected 2.819454, received 0.000000 --> location: 104
+expected 3.186327, received 0.000000 --> location: 105
+expected 2.090654, received 0.000000 --> location: 106
+expected 2.168458, received 0.000000 --> location: 107
+expected 3.257527, received 0.000000 --> location: 108
+expected 2.787860, received 0.000000 --> location: 109
+expected 2.993609, received 0.000000 --> location: 110
+expected 3.594704, received 0.000000 --> location: 111
+expected 5.104869, received 0.000000 --> location: 112
+expected 6.551815, received 0.000000 --> location: 113
+expected 4.456288, received 0.000000 --> location: 114
+expected 4.444502, received 0.000000 --> location: 115
+expected 6.313646, received 0.000000 --> location: 116
+expected 5.417465, received 0.000000 --> location: 117
+expected 6.555223, received 0.000000 --> location: 118
+expected 5.184131, received 0.000000 --> location: 119
+expected 3.590005, received 0.000000 --> location: 120
+expected 4.827351, received 0.000000 --> location: 121
+expected 3.436203, received 0.000000 --> location: 122
+expected 3.095748, received 0.000000 --> location: 123
+expected 5.177030, received 0.000000 --> location: 124
+expected 3.880256, received 0.000000 --> location: 125
+expected 4.372073, received 0.000000 --> location: 126
+expected 4.463344, received 0.000000 --> location: 127
+expected 4.309138, received 0.689250 --> location: 128
+expected 4.568636, received 0.763515 --> location: 129
+expected 4.579232, received 0.481051 --> location: 130
+expected 4.135849, received 0.526698 --> location: 131
+expected 3.997477, received 0.131093 --> location: 132
+expected 4.504519, received 0.101193 --> location: 133
+expected 4.897637, received 0.115920 --> location: 134
+expected 2.839908, received 0.218530 --> location: 135
+expected 4.381041, received 0.884460 --> location: 136
+expected 3.998887, received 0.927216 --> location: 137
+expected 4.186339, received 0.230231 --> location: 138
+expected 4.418595, received 0.852889 --> location: 139
+expected 4.220752, received 0.038626 --> location: 140
+expected 3.995392, received 0.105162 --> location: 141
+expected 5.339902, received 0.114494 --> location: 142
+expected 3.158300, received 0.724749 --> location: 143
+expected 4.102226, received 0.035075 --> location: 144
+expected 3.797525, received 0.504929 --> location: 145
+expected 3.493804, received 0.015347 --> location: 146
+expected 3.947772, received 0.716462 --> location: 147
+expected 4.110299, received 0.244662 --> location: 148
+expected 4.123978, received 0.514516 --> location: 149
+expected 4.905970, received 0.803579 --> location: 150
+expected 2.909172, received 0.818314 --> location: 151
+expected 4.258049, received 0.861748 --> location: 152
+expected 4.004225, received 0.124058 --> location: 153
+expected 4.524547, received 0.031797 --> location: 154
+expected 3.275007, received 0.300237 --> location: 155
+expected 3.409060, received 0.124291 --> location: 156
+expected 4.068736, received 0.416033 --> location: 157
+expected 4.940497, received 0.148330 --> location: 158
+expected 2.957635, received 0.352915 --> location: 159
+expected 4.014509, received 0.686691 --> location: 160
+expected 3.146123, received 0.143644 --> location: 161
+expected 3.605695, received 0.729884 --> location: 162
+expected 3.593697, received 0.556697 --> location: 163
+expected 3.690479, received 0.558393 --> location: 164
+expected 3.242568, received 0.962264 --> location: 165
+expected 4.309061, received 0.686961 --> location: 166
+expected 2.489954, received 0.707908 --> location: 167
+expected 3.711903, received 0.013741 --> location: 168
+expected 3.557710, received 0.219446 --> location: 169
+expected 4.358918, received 0.019182 --> location: 170
+expected 3.927046, received 0.374485 --> location: 171
+expected 3.435931, received 0.524278 --> location: 172
+expected 3.758476, received 0.727059 --> location: 173
+expected 4.401727, received 0.123042 --> location: 174
+expected 2.944031, received 0.028108 --> location: 175
+expected 4.202705, received 0.170083 --> location: 176
+expected 3.073768, received 0.901156 --> location: 177
+expected 3.438732, received 0.136992 --> location: 178
+expected 3.495308, received 0.842087 --> location: 179
+expected 3.342262, received 0.367711 --> location: 180
+expected 3.299056, received 0.124773 --> location: 181
+expected 4.504799, received 0.837492 --> location: 182
+expected 2.540712, received 0.808773 --> location: 183
+expected 4.529487, received 0.683919 --> location: 184
+expected 3.989807, received 0.276283 --> location: 185
+expected 3.777128, received 0.148406 --> location: 186
+expected 3.791773, received 0.944774 --> location: 187
+expected 3.715415, received 0.171349 --> location: 188
+expected 4.124876, received 0.478475 --> location: 189
+expected 4.946787, received 0.102704 --> location: 190
+expected 2.877120, received 0.166173 --> location: 191
+expected 4.303774, received 0.108500 --> location: 192
+expected 5.084618, received 0.215200 --> location: 193
+expected 3.874721, received 0.792525 --> location: 194
+expected 3.486766, received 0.250514 --> location: 195
+expected 4.452489, received 0.405085 --> location: 196
+expected 3.671601, received 0.784341 --> location: 197
+expected 5.329938, received 0.387701 --> location: 198
+expected 4.6492

@@ -87,6 +87,8 @@ bool compare_double(double a, double b) {
 
 bool compare_int(int a, int b) { return a == b; }
 
+// #define NUM_SUBREGIONS 2
+
 void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions, Context ctx,
                     Runtime *runtime) {
@@ -95,7 +97,7 @@ void top_level_task(const Task *task,
   kern->load();
 
   int num_elements = WIDTH*HEIGHT;
-  int num_subregions = 1;
+  int num_subregions = NUM_SUBREGIONS;
   int soa_flag = 0;
 
   // int width = 32;
@@ -485,16 +487,24 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
          acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
   bool all_passed = true;
-  size_t count = 0;
+  unsigned int count = 0;
   size_t errors = 0;
-
+  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   for (PointInRectIterator<1> pir(rect); pir(); pir++) {
     // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
     TYPE received = acc_z[*pir];
     TYPE expected = 0;
 
-    int row = count / WIDTH;
-    int col = count % WIDTH;
+    unsigned int subregion_index = count / (subregion_size);
+    unsigned int within_subregion_index = count % (subregion_size);
+    unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
+    unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
+    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
+    unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+
+
+    int row = start_row + within_subregion_index/subregion_width;
+    int col = start_col + within_subregion_index%subregion_width;
 
     PointInRectIterator<1> pir_x(rect);
     PointInRectIterator<1> pir_y(rect);
@@ -521,7 +531,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     if (!COMPARE(expected, received)) {
       all_passed = false;
       PRINT_EXPECTED(expected, received);
-      printf("location: %ld\n", count);
+      printf("location: %u\n", count);
       errors++;
     }
     count++;
