@@ -47,117 +47,127 @@ int (*kernels[nr_kernels])(void) = {main_kernel1};
 int main(void) { return kernels[args->kernel](); }
 
 int main_kernel1() {
-  unsigned int tasklet_id = me();
+  // unsigned int tasklet_id = me();
 
-#ifdef PRINT_UPMEM
-  if (tasklet_id == 0) {
-    printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
-           "%p...",
-           args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-           args->acc_z.ptr(args->rect.lo));
+// #ifdef PRINT_UPMEM
+//   if (tasklet_id == 0) {
+//     printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
+//            "%p...",
+//            args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
+//            args->acc_z.ptr(args->rect.lo));
 
-#ifdef INT32
-    printf(" alpha = %d \n", args->alpha);
-#elif DOUBLE
-    printf(" alpha = %f \n", args->alpha);
-#endif
-  }
-#endif
+// #ifdef INT32
+//     printf(" alpha = %d \n", args->alpha);
+// #elif DOUBLE
+//     printf(" alpha = %f \n", args->alpha);
+// #endif
+//   }
+// #endif
 
-  Rect<2> rect;
-  rect.lo.values = args->rect.lo.values;
-  rect.hi.values = args->rect.hi.values;
+  // Rect<2> rect;
+  // rect.lo.values[0] = args->rect.lo.values[0];
+  // rect.lo.values[1] = args->rect.lo.values[1];
 
-  AccessorRO block_acc_y;
-  AccessorRO block_acc_x;
-  AccessorWD block_acc_z;
+  // rect.hi.values[0] = args->rect.hi.values[0];
+  // rect.hi.values[1] = args->rect.hi.values[1];
 
-  // set base pointer for the new block accessors
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
-  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
-  // set strides from base accessor
-  block_acc_x.accessor.strides = args->acc_x.accessor.strides;
-  block_acc_y.accessor.strides = args->acc_y.accessor.strides;
-  block_acc_z.accessor.strides = args->acc_z.accessor.strides;
+  // AccessorRO block_acc_y;
+  // AccessorRO block_acc_x;
+  // AccessorWD block_acc_z;
 
-  // iterator through all elements
+  // // set base pointer for the new block accessors
+  // block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  // block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  // block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  // // set strides from base accessor
+  // block_acc_x.accessor.strides = args->acc_x.accessor.strides;
+  // block_acc_y.accessor.strides = args->acc_y.accessor.strides;
+  // block_acc_z.accessor.strides = args->acc_z.accessor.strides;
 
-  int counter = 0;
-  unsigned int index = tasklet_id;
+  // // iterator through all elements
 
-  unsigned int total_ele = WIDTH * HEIGHT;
+  // int counter = 0;
+  // unsigned int index = tasklet_id;
 
-  for(; index<total_ele; index +=NR_TASKLETS){
+  // unsigned int total_ele = WIDTH * HEIGHT;
 
-    unsigned int row = index/WIDTH;
-    unsigned int col = index%WIDTH;
-    Legion::PointInRectIterator<1> pir_a(rect);
-    Legion::PointInRectIterator<1> pir_b(rect);
-    Legion::PointInRectIterator<1> pir_z(rect);
+  // for(; index<total_ele; index +=NR_TASKLETS){
 
-    pir_a += row*WIDTH;
-    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   unsigned int row = index/WIDTH;
+  //   unsigned int col = index%WIDTH;
+  //   Legion::PointInRectIterator<2> pir_a(rect);
+  //   Legion::PointInRectIterator<2> pir_b(rect);
+  //   Legion::PointInRectIterator<2> pir_z(rect);
 
-    pir_b += col*WIDTH;
-    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   pir_a += row*WIDTH;
+  //   READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
-    Rect<1> block_rect;
-    block_rect.lo = 0;
-    block_rect.hi = WIDTH-1;
-    TYPE sum=0;
+  //   pir_b += col*WIDTH;
+  //   READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
-    for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
-         pir_block++) {
-      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
+  //   Rect<2> block_rect;
+  //   block_rect.lo.values[0] = 0;
+  //   block_rect.lo.values[1] = 0;
+  //   block_rect.hi.values[0] = WIDTH-1;
+  //   block_rect.hi.values[1] = WIDTH-1;
 
-      sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
-      // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-      //                                   block_acc_y[*pir_block]);
-    }
+  //   TYPE sum=0;
 
-    printf("sum of tasklet \n");
-    block_rect.lo = 0;
-    block_rect.hi = 0;
-    Legion::PointInRectIterator<1> pir_block(block_rect);
-    block_acc_z.write(*pir_block, me());
+  //   for (Legion::PointInRectIterator<2> pir_block(block_rect); pir_block();
+  //        pir_block++) {
+  //     printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
 
-    pir_z += index;
+  //     sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+  //     // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+  //     //                                   block_acc_y[*pir_block]);
+  //   }
 
-    WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
-  }
+  //   printf("sum of tasklet \n");
+  //   block_rect.lo.values[0] = 0;
+  //   block_rect.lo.values[1] = 0;
+  //   block_rect.hi.values[0] = 0;
+  //   block_rect.hi.values[1] = 0;
+  //   Legion::PointInRectIterator<2> pir_block(block_rect);
+  //   block_acc_z.write(*pir_block, me());
 
-  for (Legion::PointInRectIterator<1> pir(rect); pir();
-       pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
+  //   pir_z += index;
 
-    // read blocks to respective base pointers
-    // #define READ_BLOCK(point, acc_full, acc_block, bytes)  
+  //   WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
+  // }
 
-    READ_BLOCK(*pir, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  // for (Legion::PointInRectIterator<2> pir(rect); pir();
+  //      pir += (NR_TASKLETS * WIDTH * BLOCK_SIZE)) {
 
-    Rect<1> block_rect;
-    block_rect.lo = 0;
-    block_rect.hi = WIDTH-1;
+  //   // read blocks to respective base pointers
+  //   // #define READ_BLOCK(point, acc_full, acc_block, bytes)  
 
-    TYPE sum=0;
-    // block iterator
-    for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
-         pir_block++) {
-      // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+  //   READ_BLOCK(*pir, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   READ_BLOCK(*pir, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+  //   READ_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
-      sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
-      block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-                                        block_acc_y[*pir_block]);
-    }
-    Legion::PointInRectIterator<1> pir_block(block_rect);
-    block_acc_z.write(*pir_block, sum);
-    // write block
-    // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
-    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE * sizeof(TYPE));
+  //   Rect<2> block_rect;
+  //   block_rect.lo.values[0] = 0;
+  //   block_rect.lo.values[1] = 0;
+  //   block_rect.hi.values[0] = WIDTH-1;
+  //   block_rect.hi.values[1] = WIDTH-1;
 
-    counter++;
-  }
+  //   TYPE sum=0;
+  //   // block iterator
+  //   for (Legion::PointInRectIterator<2> pir_block(block_rect); pir_block();
+  //        pir_block++) {
+  //     // printf("(%f, %f) ", block_acc_x[*pir] ,block_acc_y[*pir]);
+
+  //     sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+  //     block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+  //                                       block_acc_y[*pir_block]);
+  //   }
+  //   Legion::PointInRectIterator<2> pir_block(block_rect);
+  //   block_acc_z.write(*pir_block, sum);
+  //   // write block
+  //   // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
+  //   WRITE_BLOCK(*pir, args->acc_z, block_acc_z, WIDTH * BLOCK_SIZE * sizeof(TYPE));
+
+  //   counter++;
+  // }
   return 0;
 }

@@ -22,8 +22,8 @@
 /* Brings in headers to define accessors */
 #include <realm/upmem/upmem_common.h>
 
-#define WIDTH 16
-#define HEIGHT 16
+#define WIDTH 128
+#define HEIGHT 128
 
 
 typedef FieldAccessor<LEGION_READ_ONLY,TYPE,2,coord_t,
