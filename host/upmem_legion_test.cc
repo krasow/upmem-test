@@ -46,6 +46,7 @@ using namespace Legion;
 enum TaskIDs {
   TOP_LEVEL_TASK_ID,
   INIT_FIELD_TASK_ID,
+  INIT_FIELD_TRANSPOSE_TASK_ID,
   DAXPY_TASK_ID,
   CHECK_TASK_ID,
 };
@@ -89,6 +90,16 @@ bool compare_int(int a, int b) { return a == b; }
 
 // #define NUM_SUBREGIONS 2
 
+void print_mat(TYPE *ptr, int num)
+{
+  // printf("printing a matrix x\n");
+  for(int i=0; i<num; i++){
+    if(i%WIDTH == 0) printf("\n");
+    printf("%f ", ptr[i]);
+  }
+  printf("\n");
+}
+
 void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions, Context ctx,
                     Runtime *runtime) {
@@ -100,8 +111,6 @@ void top_level_task(const Task *task,
   int num_subregions = NUM_SUBREGIONS;
   int soa_flag = 0;
 
-  // int width = 32;
-  // int height = 32;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies
   // how many subregions we should make.
@@ -114,18 +123,20 @@ void top_level_task(const Task *task,
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
         soa_flag = atoi(command_args.argv[++i]);
-      // if (!strcmp(command_args.argv[i], "-w"))
-      //   width = atoi(command_args.argv[++i]);
-      // if (!strcmp(command_args.argv[i], "-h"))
-      //   height = atoi(command_args.argv[++i]); 
     }
   }
   printf("Running mat multiplication for %d elements...\n", num_elements);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
+  
+  //Duplicating the elements
+  int num_elements_xy = num_subregions * num_elements;
 
-  // Create our logical regions using the same schemas as earlier examples
+  //creating two separate index spaces for xy and z
+  Rect<1> elem_rect_xy(0, num_elements_xy - 1);
+  IndexSpace is_xy = runtime->create_index_space(ctx, elem_rect_xy);
+  runtime->attach_name(is_xy, "is_xy");
   Rect<1> elem_rect(0, num_elements - 1);
-  IndexSpace is = runtime->create_index_space(ctx, elem_rect);
+  IndexSpace is = runtime->create_index_space(ctx, elem_rect); 
   runtime->attach_name(is, "is");
   FieldSpace fs_X = runtime->create_field_space(ctx);
   runtime->attach_name(fs_X, "fs_X");
@@ -148,9 +159,9 @@ void top_level_task(const Task *task,
     allocator.allocate_field(sizeof(TYPE), FID_Z);
     runtime->attach_name(fs_Z, FID_Z, "Z");
   }
-  LogicalRegion input_lr_X = runtime->create_logical_region(ctx, is, fs_X);
+  LogicalRegion input_lr_X = runtime->create_logical_region(ctx, is_xy, fs_X);
   runtime->attach_name(input_lr_X, "input_lr_X");
-  LogicalRegion input_lr_Y = runtime->create_logical_region(ctx, is, fs_Y);
+  LogicalRegion input_lr_Y = runtime->create_logical_region(ctx, is_xy, fs_Y);
   runtime->attach_name(input_lr_Y, "input_lr_Y");
   LogicalRegion output_lr = runtime->create_logical_region(ctx, is, fs_Z);
   runtime->attach_name(output_lr, "output_lr");
@@ -161,30 +172,19 @@ void top_level_task(const Task *task,
   TYPE *y_ptr = NULL;
   TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) { // SOA
-    size_t xyz_bytes = sizeof(TYPE) * (num_elements);
-    x_ptr = (TYPE *)malloc(xyz_bytes);
-    y_ptr = (TYPE *)malloc(xyz_bytes);
-    z_ptr = (TYPE *)malloc(xyz_bytes);
+    size_t xy_bytes = sizeof(TYPE) * (num_elements_xy);
+    size_t z_bytes = sizeof(TYPE) * (num_elements);
+    x_ptr = (TYPE *)malloc(xy_bytes);
+    y_ptr = (TYPE *)malloc(xy_bytes);
+    z_ptr = (TYPE *)malloc(z_bytes);
     for (int j = 0; j < num_elements; j++) {
-      x_ptr[j] = RANDOM_NUMBER;
-      y_ptr[j] = RANDOM_NUMBER;
       z_ptr[j] = RANDOM_NUMBER;
     }
-    // printf("printing the matrix x\n");
-    // for(int m = 0; m<HEIGHT; m++){
-    //   for(int n=0; n<WIDTH; n++){
-    //     printf("%f ", xy_ptr[m*WIDTH + n]);
-    //   }
-    //   printf("\n");
-    // }
-    // printf("printing the matrix y\n");
-    // for(int m = 0; m<HEIGHT; m++){
-    //   for(int n=0; n<WIDTH; n++){
-    //     printf("%f ", xy_ptr[m*WIDTH + n+num_elements]);
-    //   }
-    //   printf("\n");
-    // }
-    
+    for (int j = 0; j < num_elements_xy; j++) {
+      x_ptr[j] = RANDOM_NUMBER;
+      y_ptr[j] = RANDOM_NUMBER;
+    }
+       
     {
       printf("Attach SOA array fid %d, ptr %p\n", FID_X, x_ptr);
       AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr_X, input_lr_X);
@@ -194,7 +194,7 @@ void top_level_task(const Task *task,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
                                        attach_fields.end());
-      Realm::ExternalMemoryResource resource(x_ptr, xyz_bytes);
+      Realm::ExternalMemoryResource resource(x_ptr, xy_bytes);
       launcher.external_resource = &resource;
       x_pr = runtime->attach_external_resource(ctx, launcher);
     }
@@ -207,7 +207,7 @@ void top_level_task(const Task *task,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
                                        attach_fields.end());
-      Realm::ExternalMemoryResource resource(y_ptr, xyz_bytes);
+      Realm::ExternalMemoryResource resource(y_ptr, xy_bytes);
       launcher.external_resource = &resource;
       y_pr = runtime->attach_external_resource(ctx, launcher);
     }
@@ -220,7 +220,7 @@ void top_level_task(const Task *task,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
                                        attach_fields.end());
-      Realm::ExternalMemoryResource resource(z_ptr, xyz_bytes);
+      Realm::ExternalMemoryResource resource(z_ptr, xy_bytes);
       launcher.external_resource = &resource;
       z_pr = runtime->attach_external_resource(ctx, launcher);
     }
@@ -288,13 +288,8 @@ void top_level_task(const Task *task,
   // or not.  There are other methods to partitioning index spaces
   // which are not covered here.  We'll cover the case of coloring
   // individual points in an index space in our capstone circuit example.
-  IndexPartition ip = runtime->create_equal_partition(ctx, is, color_is);
+  IndexPartition ip = runtime->create_equal_partition(ctx, is_xy, color_is);
   runtime->attach_name(ip, "ip");
-
-  Rect<1> color_bounds_Z(0, num_subregions*num_subregions - 1);
-  IndexSpace color_is_Z = runtime->create_index_space(ctx, color_bounds_Z);
-  IndexPartition ip_Z = runtime->create_equal_partition(ctx, is, color_is_Z);
-  runtime->attach_name(ip_Z, "ip_Z");
 
   // The index space 'is' was used in creating two logical regions: 'input_lr'
   // and 'output_lr'.  By creating an IndexPartitiong of 'is' we implicitly
@@ -304,18 +299,65 @@ void top_level_task(const Task *task,
   // 'get_logical_partition' method takes a LogicalRegion and an IndexPartition
   // and returns the LogicalPartition of the given LogicalRegion that
   // corresponds to the given IndexPartition.
-  LogicalPartition input_lp_X = runtime->get_logical_partition(ctx, input_lr_X, ip);
-  runtime->attach_name(input_lp_X, "input_lp_X");
-  LogicalPartition input_lp_Y = runtime->get_logical_partition(ctx, input_lr_Y, ip);
-  runtime->attach_name(input_lp_Y, "input_lp_Y");
-  LogicalPartition output_lp = runtime->get_logical_partition(ctx, output_lr, ip_Z);
+  LogicalPartition input_lp_X_init = runtime->get_logical_partition(ctx, input_lr_X, ip);
+  runtime->attach_name(input_lp_X_init, "input_lp_X_init");
+  LogicalPartition input_lp_Y_init = runtime->get_logical_partition(ctx, input_lr_Y, ip);
+  runtime->attach_name(input_lp_Y_init, "input_lp_Y_init");
+
+
+  ArgumentMap arg_map_init;
+  for(int i=0; i<num_subregions; i++){
+    int taskid = num_subregions;
+    arg_map_init.set_point(Point<1>(i), TaskArgument(&taskid, sizeof(int)));
+  }
+
+
+  double start_init = get_cur_time();
+
+  printf("the starting point of the init task\n");
+  IndexLauncher init_launcher_X(INIT_FIELD_TASK_ID, color_is,
+                              TaskArgument(NULL, 0), arg_map_init);
+
+  init_launcher_X.add_region_requirement(RegionRequirement(
+      input_lp_X_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_X));
+  init_launcher_X.region_requirements[0].add_field(FID_X);
+  FutureMap fmi0 = runtime->execute_index_space(ctx, init_launcher_X);
+  
+
+  IndexLauncher init_launcher_Y(INIT_FIELD_TRANSPOSE_TASK_ID, color_is,
+                              TaskArgument(NULL, 0), arg_map_init);
+  init_launcher_Y.add_region_requirement(RegionRequirement(
+      input_lp_Y_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_Y));
+  init_launcher_Y.region_requirements[0].add_field(FID_Y);
+  FutureMap fmi1 = runtime->execute_index_space(ctx, init_launcher_Y);
+  fmi1.wait_all_results();
+  fmi0.wait_all_results();
+  double end_init = get_cur_time();
+  printf("Attach array, init done, time %f\n", end_init - start_init);
+
+
+
+
+  // 2*2 - 1
+  Rect<1> color_bounds_mat(0, num_subregions*num_subregions - 1);
+  IndexSpace color_is_mat = runtime->create_index_space(ctx, color_bounds_mat);
+  IndexPartition ip_mat = runtime->create_equal_partition(ctx, is_xy, color_is_mat);
+  runtime->attach_name(ip_mat, "ip_mat");
+
+  IndexPartition ip_mat_z = runtime->create_equal_partition(ctx, is, color_is_mat);
+  runtime->attach_name(ip_mat_z, "ip_mat_z");
+  
+  
+  LogicalPartition input_lp_X_mat = runtime->get_logical_partition(ctx, input_lr_X, ip_mat);
+  runtime->attach_name(input_lp_X_mat, "input_lp_X_mat");
+  LogicalPartition input_lp_Y_mat = runtime->get_logical_partition(ctx, input_lr_Y, ip_mat);
+  runtime->attach_name(input_lp_Y_mat, "input_lp_Y_mat");
+  LogicalPartition output_lp = runtime->get_logical_partition(ctx, output_lr, ip_mat_z);
   runtime->attach_name(output_lp, "output_lp");
 
   // Create our launch domain.  Note that is the same as color domain
   // as we are going to launch one task for each subregion we created.
-  //TODO: modify this map to launch tasks
   ArgumentMap arg_map;
-  double start_init = get_cur_time();
 
   // As in previous examples, we now want to launch tasks for initializing
   // both the fields.  However, to increase the amount of parallelism
@@ -323,25 +365,7 @@ void top_level_task(const Task *task,
   // the logical subregions created by our partitioning.  To express this
   // we create an IndexLauncher for launching an index space of tasks
   // the same as example 02.
-  IndexLauncher init_launcher_X(INIT_FIELD_TASK_ID, color_is,
-                              TaskArgument(NULL, 0), arg_map);
-
-  init_launcher_X.add_region_requirement(RegionRequirement(
-      input_lp_X, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_X));
-  init_launcher_X.region_requirements[0].add_field(FID_X);
-  FutureMap fmi0 = runtime->execute_index_space(ctx, init_launcher_X);
   
-
-  IndexLauncher init_launcher_Y(INIT_FIELD_TASK_ID, color_is,
-                              TaskArgument(NULL, 0), arg_map);
-  init_launcher_Y.add_region_requirement(RegionRequirement(
-      input_lp_Y, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_Y));
-  init_launcher_Y.region_requirements[0].add_field(FID_Y);
-  FutureMap fmi1 = runtime->execute_index_space(ctx, init_launcher_Y);
-  fmi1.wait_all_results();
-  fmi0.wait_all_results();
-  double end_init = get_cur_time();
-  printf("Attach array, init done, time %f\n", end_init - start_init);
 
   const TYPE alpha = RANDOM_NUMBER;
   double start_t = get_cur_time();
@@ -353,13 +377,13 @@ void top_level_task(const Task *task,
   // in a similar way to the initialize field tasks.  Note we
   // again make use of two RegionRequirements which use a
   // partition as the upper bound for the privileges for the task.
-  IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is,
+  IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is_mat,
                                TaskArgument(&args, sizeof(DPU_TASK_ARGS)),
                                arg_map);
   daxpy_launcher.add_region_requirement(RegionRequirement(
-      input_lp_X, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_X));
+      input_lp_X_mat, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_X));
   daxpy_launcher.add_region_requirement(RegionRequirement(
-      input_lp_Y, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_Y));
+      input_lp_Y_mat, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_Y));
   daxpy_launcher.region_requirements[0].add_field(FID_X);
   daxpy_launcher.region_requirements[1].add_field(FID_Y);
   daxpy_launcher.add_region_requirement(RegionRequirement(
@@ -419,6 +443,8 @@ void init_field_task(const Task *task,
   FieldID fid = *(task->regions[0].privilege_fields.begin());
   const int point = task->index_point.point_data[0];
   printf("Initializing field %d for block %d...\n", fid, point);
+  int num_subregions = *((const int *)task->local_args);
+  // printf("the argument value that I got is %d \n", num_subregions);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -427,8 +453,71 @@ void init_field_task(const Task *task,
   // both as a single task and as part of an index space of tasks.
   Rect<1> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
-  for (PointInRectIterator<1> pir(rect); pir(); pir++)
-    acc[*pir] = RANDOM_NUMBER;
+  
+
+  PointInRectIterator<1> *all_iters = new PointInRectIterator<1>[num_subregions];
+  int size_duplication = HEIGHT*WIDTH/num_subregions;
+  for(int i=0; i<num_subregions; i++){
+      PointInRectIterator<1> pir(rect);
+      all_iters[i] = pir;
+      int step = size_duplication * i;
+      for(int j=0; j<step; j++){
+        all_iters[i]++;
+      }
+  }
+
+  for(int i=0; i<size_duplication; i++){
+    TYPE v = RANDOM_NUMBER;
+    for(int j=0; j<num_subregions; j++){
+      acc[*(all_iters[j])] = v;
+      all_iters[j]++;
+    }
+  }
+
+  // for (PointInRectIterator<1> pir(rect); pir(); pir++)
+  //   acc[*pir] = RANDOM_NUMBER;
+
+
+  delete[] all_iters;
+}
+
+void init_field_task_transpose(const Task *task,
+                     const std::vector<PhysicalRegion> &regions, Context ctx,
+                     Runtime *runtime) {
+  assert(regions.size() == 1);
+  assert(task->regions.size() == 1);
+  assert(task->regions[0].privilege_fields.size() == 1);
+
+  FieldID fid = *(task->regions[0].privilege_fields.begin());
+  const int point = task->index_point.point_data[0];
+  printf("Initializing transpose field %d for block %d...\n", fid, point);
+  int num_subregions = *((const int *)task->local_args);
+  // printf("the argument value that I got is %d \n", num_subregions);
+
+  const AccessorWD acc(regions[0], fid);
+
+  // Note here that we get the domain for the subregion for
+  // this task from the runtime which makes it safe for running
+  // both as a single task and as part of an index space of tasks.
+  Rect<1> rect = runtime->get_index_space_domain(
+      ctx, task->regions[0].region.get_index_space());
+
+  if(rect.lo == Point<1>(0)){
+    for (PointInRectIterator<1> pir(rect); pir(); pir++)
+      acc[*pir] = RANDOM_NUMBER;
+  }else{
+    int size_duplication = HEIGHT*WIDTH;
+    Rect<1> rect_ori;
+    //? there would be multiple threads reading the same data, will it cause some problem
+    rect_ori.lo = Point<1>(0);
+    rect_ori.hi = Point<1>(HEIGHT*WIDTH - 1);
+    PointInRectIterator<1> pir_ori(rect_ori);
+    for (PointInRectIterator<1> pir(rect); pir(); pir++){
+      acc[*pir] = acc[*pir_ori];
+      pir_ori++;
+    }
+
+  }
 }
 
 void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
@@ -481,69 +570,94 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   const AccessorRO acc_y(regions[1], FID_Y);
   const AccessorRO acc_z(regions[2], FID_Z);
 
-  Rect<1> rect = runtime->get_index_space_domain(
+  Rect<1> rect_z = runtime->get_index_space_domain(
       ctx, task->regions[2].region.get_index_space());
-  const void *ptr = acc_z.ptr(rect.lo);
-  printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
-         acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
-  bool all_passed = true;
-  unsigned int count = 0;
-  size_t errors = 0;
-  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
-  for (PointInRectIterator<1> pir(rect); pir(); pir++) {
-    // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
-    TYPE received = acc_z[*pir];
-    TYPE expected = 0;
 
-    unsigned int subregion_index = count / (subregion_size);
-    unsigned int within_subregion_index = count % (subregion_size);
-    unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
-    unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
-    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
-    unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+  Rect<1> rect_xy = runtime->get_index_space_domain(
+      ctx, task->regions[0].region.get_index_space());
 
 
-    int row = start_row + within_subregion_index/subregion_width;
-    int col = start_col + within_subregion_index%subregion_width;
+  int counter = 0;
+  for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
 
-    PointInRectIterator<1> pir_x(rect);
-    PointInRectIterator<1> pir_y(rect);
+    if(counter % WIDTH == 0) printf("\n");
+    printf("%f ", acc_x[*pir_xy]);
 
-    for(int i=0; i<row*WIDTH; i++) pir_x++;
-    for(int i=0; i<col*HEIGHT; i++) pir_y++;
-    // pir_x += row*WIDTH;
-    // pir_y += col*HEIGHT;
-
-    for(int i=0; i<WIDTH; i++){
-      // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
-
-      expected += acc_x[*pir_x] * acc_y[*pir_y];
-      pir_x++;
-      pir_y++;
-      // count++;
-    }    
-    // PRINT_EXPECTED(expected, received);
-    // printf("location: %ld\n", count);
-    // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
-    // Probably shouldn't check for floating point equivalence but
-    // the order of operations are the same should they should
-    // be bitwise equal.
-    if (!COMPARE(expected, received)) {
-      all_passed = false;
-      PRINT_EXPECTED(expected, received);
-      printf("location: %u\n", count);
-      errors++;
-    }
-    count++;
-    // count+=32;
+    counter++;
   }
-  if (all_passed)
-    printf("SUCCESS!\n");
-  else {
-    printf("FAILURE!\n");
-    printf("%ld ERRORS WERE FOUND\n", errors);
-    abort();
+
+  counter = 0;
+  for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
+
+    if(counter % WIDTH == 0) printf("\n");
+    printf("%f ", acc_y[*pir_xy]);
+
+    counter++;
   }
+
+
+  
+  // const void *ptr = acc_z.ptr(rect.lo);
+  // printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
+  //        acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
+  // bool all_passed = true;
+  // unsigned int count = 0;
+  // size_t errors = 0;
+  // unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  // for (PointInRectIterator<1> pir(rect); pir(); pir++) {
+  //   // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
+  //   TYPE received = acc_z[*pir];
+  //   TYPE expected = 0;
+
+  //   unsigned int subregion_index = count / (subregion_size);
+  //   unsigned int within_subregion_index = count % (subregion_size);
+  //   unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
+  //   unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
+  //   unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
+  //   unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+
+
+  //   int row = start_row + within_subregion_index/subregion_width;
+  //   int col = start_col + within_subregion_index%subregion_width;
+
+  //   PointInRectIterator<1> pir_x(rect);
+  //   PointInRectIterator<1> pir_y(rect);
+
+  //   for(int i=0; i<row*WIDTH; i++) pir_x++;
+  //   for(int i=0; i<col*HEIGHT; i++) pir_y++;
+  //   // pir_x += row*WIDTH;
+  //   // pir_y += col*HEIGHT;
+
+  //   for(int i=0; i<WIDTH; i++){
+  //     // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
+
+  //     expected += acc_x[*pir_x] * acc_y[*pir_y];
+  //     pir_x++;
+  //     pir_y++;
+  //     // count++;
+  //   }    
+  //   // PRINT_EXPECTED(expected, received);
+  //   // printf("location: %ld\n", count);
+  //   // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
+  //   // Probably shouldn't check for floating point equivalence but
+  //   // the order of operations are the same should they should
+  //   // be bitwise equal.
+  //   if (!COMPARE(expected, received)) {
+  //     all_passed = false;
+  //     PRINT_EXPECTED(expected, received);
+  //     printf("location: %u\n", count);
+  //     errors++;
+  //   }
+  //   count++;
+  //   // count+=32;
+  // }
+  // if (all_passed)
+  //   printf("SUCCESS!\n");
+  // else {
+  //   printf("FAILURE!\n");
+  //   printf("%ld ERRORS WERE FOUND\n", errors);
+  //   abort();
+  // }
 }
 
 int main(int argc, char **argv) {
@@ -561,7 +675,14 @@ int main(int argc, char **argv) {
     registrar.set_leaf();
     Runtime::preregister_task_variant<init_field_task>(registrar, "init_field");
   }
-
+  
+  {
+    TaskVariantRegistrar registrar(INIT_FIELD_TRANSPOSE_TASK_ID, "init_field_transpose");
+    registrar.add_constraint(ProcessorConstraint(Processor::LOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<init_field_task_transpose>(registrar, "init_field_transpose");
+  }
+  
   {
     TaskVariantRegistrar registrar(DAXPY_TASK_ID, "daxpy");
     registrar.add_constraint(ProcessorConstraint(Processor::DPU_PROC));
