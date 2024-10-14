@@ -513,8 +513,8 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     // be bitwise equal.
     if (!COMPARE(expected, received)) {
       all_passed = false;
-      PRINT_EXPECTED(expected, received);
-      printf("location: %ld\n", count);
+      // PRINT_EXPECTED(expected, received);
+      // printf("location: %ld\n", count);
       errors++;
     }
     count++;

@@ -47,35 +47,36 @@ int (*kernels[nr_kernels])(void) = {main_kernel1};
 int main(void) { return kernels[args->kernel](); }
 
 int main_kernel1() {
-  // unsigned int tasklet_id = me();
+  unsigned int tasklet_id = me();
 
-// #ifdef PRINT_UPMEM
-//   if (tasklet_id == 0) {
-//     printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
-//            "%p...",
-//            args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-//            args->acc_z.ptr(args->rect.lo));
+#if 1
+  if (tasklet_id == 0) {
+    printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
+           "%p...",
+           args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
+           args->acc_z.ptr(args->rect.lo));
 
-// #ifdef INT32
-//     printf(" alpha = %d \n", args->alpha);
-// #elif DOUBLE
-//     printf(" alpha = %f \n", args->alpha);
-// #endif
-//   }
-// #endif
+#ifdef INT32
+    printf(" alpha = %d \n", args->alpha);
+#elif DOUBLE
+    printf(" alpha = %f \n", args->alpha);
+#endif
+  }
+#endif
 
-  // Rect<2> rect;
-  // rect.lo.values[0] = args->rect.lo.values[0];
-  // rect.lo.values[1] = args->rect.lo.values[1];
+  Rect<2> rect;
+  rect.lo.values[0] = args->rect.lo.values[0];
+  rect.lo.values[1] = args->rect.lo.values[1];
 
-  // rect.hi.values[0] = args->rect.hi.values[0];
-  // rect.hi.values[1] = args->rect.hi.values[1];
+  rect.hi.values[0] = args->rect.hi.values[0];
+  rect.hi.values[1] = args->rect.hi.values[1];
 
-  // AccessorRO block_acc_y;
-  // AccessorRO block_acc_x;
-  // AccessorWD block_acc_z;
+  AccessorRO block_acc_y;
+  AccessorRO block_acc_x;
+  AccessorWD block_acc_z;
 
-  // // set base pointer for the new block accessors
+  // set base pointer for the new block accessors
+  printf("%d\n", BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));

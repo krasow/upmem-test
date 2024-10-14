@@ -41,12 +41,12 @@ typedef enum DPU_LAUNCH_KERNELS{
 typedef struct DPU_LAUNCH_ARGS{
   // size_t width;
   // size_t height;
+  DPU_LAUNCH_KERNELS kernel;
   TYPE alpha;
   Rect<2> rect;
   AccessorRO acc_y;
   AccessorRO acc_x;
   AccessorWD acc_z;
-  DPU_LAUNCH_KERNELS kernel;
   PADDING(8);
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
 
