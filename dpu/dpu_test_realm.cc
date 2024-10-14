@@ -51,32 +51,110 @@ int main_kernel1() {
   unsigned int tasklet_id = me();
 
 #ifdef PRINT_UPMEM
-  if (tasklet_id == 0) {
-    printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
-           "%p...",
-           args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-           args->acc_z.ptr(args->rect.lo));
+  printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect.lo.value);
 
-#ifdef INT32
-    printf(" alpha = %d \n", args->alpha);
-#elif DOUBLE
-    printf(" alpha = %f \n", args->alpha);
+  // if (tasklet_id == 0) {
+  //   printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
+  //          "%p...",
+  //          args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
+  //          args->acc_z.ptr(args->rect.lo));
+  // }
+
+
 #endif
+
+  //print the matrix
+  Rect<1> rect;
+  rect.lo = args->rect.lo;
+  rect.hi = args->rect.hi;
+
+  unsigned int range = rect.hi.value - rect.lo.value;
+  unsigned int index = rect.lo.value;
+  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
+  unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
+  unsigned int subregion_index = index/subregion_size;
+  unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
+  unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+  unsigned int end_row = start_row + subregion_height - 1;
+  unsigned int end_col = start_col + subregion_width - 1;
+
+  AccessorRO block_acc_y;
+  AccessorRO block_acc_x;
+  AccessorWD block_acc_z;
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
+  // set strides from base accessor
+  block_acc_x.accessor.strides = args->acc_x.accessor.strides;
+  block_acc_y.accessor.strides = args->acc_y.accessor.strides;
+  block_acc_z.accessor.strides = args->acc_z.accessor.strides;
+
+  unsigned int curr_row = 0;
+  unsigned int curr_col = 0;
+
+  for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
+    //read data
+    Rect<1> temp_rect;
+    temp_rect.lo = 0;
+    temp_rect.hi = WIDTH*HEIGHT;
+    Legion::PointInRectIterator<1> pir_a(temp_rect);
+    Legion::PointInRectIterator<1> pir_b(temp_rect);
+    Legion::PointInRectIterator<1> pir_z(rect); 
+    curr_row = counter/subregion_width;
+    curr_col = counter%subregion_width;
+
+    pir_a += curr_row*WIDTH;
+    pir_b += curr_col*WIDTH;
+    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+    //calculation
+    Rect<1> block_rect;
+    block_rect.lo = 0;
+    block_rect.hi = WIDTH-1;
+    TYPE sum=0;
+    // printf("the subregion size")
+    for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
+         pir_block++) {
+      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
+
+      sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+      // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+      //                                   block_acc_y[*pir_block]);
+    }
+
+    printf("\n");
+
+    //write data into temp block
+    block_rect.lo = 0;
+    block_rect.hi = 0;
+    Legion::PointInRectIterator<1> pir_block(block_rect);
+    block_acc_z.write(*pir_block, sum);
+
+    //write data into accessor
+    pir_z+=counter;
+    WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
+
+
+    // curr_row += NR_TASKLETS/subregion_width;
+    // curr_col += NR_TASKLETS;
+    // curr_col %= subregion_width;
   }
-#endif
 
-  
 
   // Rect<1> rect;
   // rect.lo = args->rect.lo;
   // rect.hi = args->rect.hi;
+
+  // unsigned int range = rect.hi.value - rect.lo.value;
 
   // unsigned int index = rect.lo.value;
   // unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   // unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
   // unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
   // unsigned int subregion_index = index/subregion_size;
-  // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
+  // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
   // unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
   // unsigned int end_row = start_row + subregion_height - 1;
   // unsigned int end_col = start_col + subregion_width - 1;
@@ -99,10 +177,10 @@ int main_kernel1() {
   // // iterator through all elements
 
   // // int counter = 0;
+  // unsigned int curr_row = 0;
+  // unsigned int curr_col = 0;
 
-  // unsigned int curr_row = start_row + tasklet_id/subregion_width;
-  // unsigned int curr_col = tasklet_id%subregion_width;
-  // for(unsigned int counter = tasklet_id; counter < subregion_size; counter += NR_TASKLETS){
+  // for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
   //   //read data
   //   Rect<1> temp_rect;
   //   temp_rect.lo = 0;
@@ -110,8 +188,12 @@ int main_kernel1() {
   //   Legion::PointInRectIterator<1> pir_a(temp_rect);
   //   Legion::PointInRectIterator<1> pir_b(temp_rect);
   //   Legion::PointInRectIterator<1> pir_z(rect);
+  //TODO: it is not the size, but the width
+  //   curr_row = counter/subregion_size + start_row;
+  //   curr_col = counter%subregion_size + start_col;
+
   //   pir_a += curr_row*WIDTH;
-  //   pir_b += (curr_col+start_col)*WIDTH;
+  //   pir_b += curr_col*WIDTH;
   //   READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
   //   READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
 
@@ -129,6 +211,8 @@ int main_kernel1() {
   //     //                                   block_acc_y[*pir_block]);
   //   }
 
+  //   printf("%f ", sum);
+
   //   //write data into temp block
   //   block_rect.lo = 0;
   //   block_rect.hi = 0;
@@ -140,9 +224,9 @@ int main_kernel1() {
   //   WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
 
 
-  //   curr_row += NR_TASKLETS/subregion_width;
-  //   curr_col += NR_TASKLETS;
-  //   curr_col %= subregion_width;
+  //   // curr_row += NR_TASKLETS/subregion_width;
+  //   // curr_col += NR_TASKLETS;
+  //   // curr_col %= subregion_width;
   // }
 
   return 0;

@@ -576,88 +576,83 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect_xy = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
 
-
   int counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
-
     if(counter % WIDTH == 0) printf("\n");
     printf("%f ", acc_x[*pir_xy]);
-
     counter++;
   }
+
+  printf("\n");
 
   counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
-
     if(counter % WIDTH == 0) printf("\n");
     printf("%f ", acc_y[*pir_xy]);
-
     counter++;
   }
-
-
   
-  // const void *ptr = acc_z.ptr(rect.lo);
+  // const void *ptr = acc_z.ptr(rect_z.lo);
   // printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
-  //        acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
-  // bool all_passed = true;
-  // unsigned int count = 0;
-  // size_t errors = 0;
-  // unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
-  // for (PointInRectIterator<1> pir(rect); pir(); pir++) {
-  //   // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
-  //   TYPE received = acc_z[*pir];
-  //   TYPE expected = 0;
+        //  acc_x.ptr(rect_xy.lo), acc_y.ptr(rect_xy.lo), ptr);
+  bool all_passed = true;
+  unsigned int count = 0;
+  size_t errors = 0;
+  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  for (PointInRectIterator<1> pir(rect_z); pir(); pir++) {
+    // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
+    TYPE received = acc_z[*pir];
+    TYPE expected = 0;
 
-  //   unsigned int subregion_index = count / (subregion_size);
-  //   unsigned int within_subregion_index = count % (subregion_size);
-  //   unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
-  //   unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
-  //   unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * subregion_height;
-  //   unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+    unsigned int subregion_index = count / (subregion_size);
+    unsigned int within_subregion_index = count % (subregion_size);
+    unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
+    unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
+    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
+    unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
 
 
-  //   int row = start_row + within_subregion_index/subregion_width;
-  //   int col = start_col + within_subregion_index%subregion_width;
+    int row = start_row + within_subregion_index/subregion_width;
+    int col = start_col + within_subregion_index%subregion_width;
 
-  //   PointInRectIterator<1> pir_x(rect);
-  //   PointInRectIterator<1> pir_y(rect);
+    PointInRectIterator<1> pir_x(rect_xy);
+    PointInRectIterator<1> pir_y(rect_xy);
 
-  //   for(int i=0; i<row*WIDTH; i++) pir_x++;
-  //   for(int i=0; i<col*HEIGHT; i++) pir_y++;
-  //   // pir_x += row*WIDTH;
-  //   // pir_y += col*HEIGHT;
+    for(int i=0; i<row*WIDTH; i++) pir_x++;
+    for(int i=0; i<col*HEIGHT; i++) pir_y++;
+    // pir_x += row*WIDTH;
+    // pir_y += col*HEIGHT;
 
-  //   for(int i=0; i<WIDTH; i++){
-  //     // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
+    for(int i=0; i<WIDTH; i++){
+      // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
 
-  //     expected += acc_x[*pir_x] * acc_y[*pir_y];
-  //     pir_x++;
-  //     pir_y++;
-  //     // count++;
-  //   }    
-  //   // PRINT_EXPECTED(expected, received);
-  //   // printf("location: %ld\n", count);
-  //   // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
-  //   // Probably shouldn't check for floating point equivalence but
-  //   // the order of operations are the same should they should
-  //   // be bitwise equal.
-  //   if (!COMPARE(expected, received)) {
-  //     all_passed = false;
-  //     PRINT_EXPECTED(expected, received);
-  //     printf("location: %u\n", count);
-  //     errors++;
-  //   }
-  //   count++;
-  //   // count+=32;
-  // }
-  // if (all_passed)
-  //   printf("SUCCESS!\n");
-  // else {
-  //   printf("FAILURE!\n");
-  //   printf("%ld ERRORS WERE FOUND\n", errors);
-  //   abort();
-  // }
+      expected += acc_x[*pir_x] * acc_y[*pir_y];
+      pir_x++;
+      pir_y++;
+      // count++;
+    }    
+    // PRINT_EXPECTED(expected, received);
+    // printf("location: %ld\n", count);
+    // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
+    // Probably shouldn't check for floating point equivalence but
+    // the order of operations are the same should they should
+    // be bitwise equal.
+    if (!COMPARE(expected, received)) {
+      all_passed = false;
+      PRINT_EXPECTED(expected, received);
+      printf("location: %u\n", count);
+      errors++;
+    }
+    count++;
+    // count+=32;
+  }
+  if (all_passed)
+    printf("SUCCESS!\n");
+  else {
+    printf("FAILURE!\n");
+    printf("%ld ERRORS WERE FOUND\n", errors);
+    abort();
+  }
 }
 
 int main(int argc, char **argv) {
