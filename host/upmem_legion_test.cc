@@ -62,6 +62,7 @@ typedef struct {
 enum FieldIDs {
   FID_X,
   FID_Y,
+  FID_YT,
   FID_Z,
 };
 
@@ -147,6 +148,8 @@ void top_level_task(const Task *task,
     runtime->attach_name(fs, FID_X, "X");
     allocator.allocate_field(sizeof(TYPE), FID_Y);
     runtime->attach_name(fs, FID_Y, "Y");
+    allocator.allocate_field(sizeof(TYPE), FID_YT);
+    runtime->attach_name(fs, FID_YT, "YT");
     allocator.allocate_field(sizeof(TYPE), FID_Z);
     runtime->attach_name(fs, FID_Z, "Z");
   }
@@ -160,13 +163,14 @@ void top_level_task(const Task *task,
   TYPE *xy_ptr = NULL;
   TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) { // SOA
-    size_t xy_bytes = 2 /*fields*/ * sizeof(TYPE) * (num_elements_xy);
+    size_t xy_bytes = 3 /*fields*/ * sizeof(TYPE) * (num_elements_xy);
     xy_ptr = (TYPE *)malloc(xy_bytes);
     size_t z_bytes = sizeof(TYPE) * (num_elements);
     z_ptr = (TYPE *)malloc(z_bytes);
     for (int j = 0; j < num_elements_xy; j++) {
       xy_ptr[j] = RANDOM_NUMBER;
       xy_ptr[num_elements + j] = RANDOM_NUMBER;
+      xy_ptr[2*num_elements + j] = RANDOM_NUMBER;
     }
 
     for (int j = 0; j < num_elements; j++) {
@@ -175,9 +179,10 @@ void top_level_task(const Task *task,
     {
       printf("Attach SOA array fid %d, fid %d, ptr %p\n", FID_X, FID_Y, xy_ptr);
       AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr, input_lr);
-      std::vector<FieldID> attach_fields(2);
+      std::vector<FieldID> attach_fields(3);
       attach_fields[0] = FID_X;
       attach_fields[1] = FID_Y;
+      attach_fields[2] = FID_YT;
       launcher.initialize_constraints(false /*column major*/, true /*soa*/,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
@@ -336,7 +341,7 @@ void top_level_task(const Task *task,
   // and returns the LogicalPartition of the given LogicalRegion that
   // corresponds to the given IndexPartition.
   LogicalPartition input_lp  = runtime->get_logical_partition(ctx, input_lr, ip);
-  runtime->attach_name(input_lp , "input_lr");
+  runtime->attach_name(input_lp , "input_lp");
   // LogicalPartition input_lp_Y_init = runtime->get_logical_partition(ctx, input_lr_Y, ip);
   // runtime->attach_name(input_lp_Y_init, "input_lp_Y_init");
 
@@ -365,16 +370,25 @@ void top_level_task(const Task *task,
   fm_Y_init.wait_all_results();
 
   ArgumentMap t_argmap;
-  Rect<1> transpose_color(0, 1);
+  Rect<1> transpose_color(0, 0);
   IndexSpace transpose_color_is = runtime->create_index_space(ctx, transpose_color);
+
+  IndexPartition transpose_ip = runtime->create_equal_partition(ctx, is_xy, transpose_color_is);
+  runtime->attach_name(transpose_ip, "transpose_ip");
+
+  LogicalPartition transpose_lp  = runtime->get_logical_partition(ctx, input_lr, transpose_ip);
+  runtime->attach_name(transpose_lp , "transpose_lp");
 
 
   IndexLauncher transpose(INIT_FIELD_TRANSPOSE_TASK_ID, transpose_color_is,
                               TaskArgument(NULL, 0), t_argmap);
 
   transpose.add_region_requirement(RegionRequirement(
-      input_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr));
+      transpose_lp, 0 /*projection ID*/, READ_WRITE, EXCLUSIVE, input_lr));
+
   transpose.region_requirements[0].add_field(FID_Y);
+  transpose.region_requirements[0].add_field(FID_YT);
+
   FutureMap fmi_Y_transpose = runtime->execute_index_space(ctx, transpose);
   fmi_Y_transpose.wait_all_results();
   fm_X_init.wait_all_results();
@@ -417,7 +431,7 @@ void top_level_task(const Task *task,
   matrix_multi_launcher.add_region_requirement(RegionRequirement(
       input_lp, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr));
   matrix_multi_launcher.region_requirements[0].add_field(FID_X);
-  matrix_multi_launcher.region_requirements[0].add_field(FID_Y);
+  matrix_multi_launcher.region_requirements[0].add_field(FID_YT);
   matrix_multi_launcher.add_region_requirement(RegionRequirement(
       output_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, output_lr));
   matrix_multi_launcher.region_requirements[1].add_field(FID_Z);
@@ -438,7 +452,7 @@ void top_level_task(const Task *task,
                               TaskArgument(&alpha, sizeof(alpha)));
   check_launcher.add_region_requirement(RegionRequirement(input_lr, READ_ONLY, EXCLUSIVE, input_lr));
   check_launcher.region_requirements[0].add_field(FID_X);
-  check_launcher.region_requirements[0].add_field(FID_Y);
+  check_launcher.region_requirements[0].add_field(FID_YT);
   check_launcher.add_region_requirement(RegionRequirement(output_lr, READ_ONLY, EXCLUSIVE, output_lr));
   check_launcher.region_requirements[1].add_field(FID_Z);
   Future fu = runtime->execute_task(ctx, check_launcher);
@@ -492,36 +506,30 @@ void init_field_task_transpose(const Task *task,
                      Runtime *runtime) {
   assert(regions.size() == 1);
   assert(task->regions.size() == 1);
-  assert(task->regions[0].privilege_fields.size() == 1);
+  assert(task->regions[0].privilege_fields.size() == 2);
 
   FieldID fid = *(task->regions[0].privilege_fields.begin());
+  FieldID fid_transpose = *(task->regions[0].privilege_fields.end());
+
   const int point = task->index_point.point_data[0];
   printf("Initializing transpose field %d for block %d...\n", fid, point);
 
   const AccessorWD acc(regions[0], fid);
+  const AccessorWD acc_t(regions[0], fid_transpose);
 
   // Note here that we get the domain for the subregion for
   // this task from the runtime which makes it safe for running
   // both as a single task and as part of an index space of tasks.
-  Rect<1> rect = runtime->get_index_space_domain(
-      ctx, task->regions[0].region.get_index_space());
+  Rect<1> rect = runtime->get_index_space_domain(ctx, task->regions[0].region.get_index_space());
+  int count = 0;
+  for (PointInRectIterator<1> pir(rect); pir(); pir++) {
+      int j = count / (WIDTH);
+      int i = count % (WIDTH);
 
-  // if(rect.lo == Point<1>(0)){
-    // for (PointInRectIterator<1> pir(rect); pir(); pir++)
-    //   acc[*pir] = RANDOM_NUMBER;
-  // }else{
-    // int size_duplication = HEIGHT*WIDTH;
-    // Rect<1> rect_ori;
-    // //? there would be multiple threads reading the same data, will it cause some problem
-    // rect_ori.lo = Point<1>(0);
-    // rect_ori.hi = Point<1>(HEIGHT*WIDTH - 1);
-    // PointInRectIterator<1> pir_ori(rect_ori);
-    // for (PointInRectIterator<1> pir(rect); pir(); pir++){
-    //   acc[*pir] = acc[*pir_ori];
-    //   pir_ori++;
-    // }
+      acc_t[j*(HEIGHT)+i] = acc[i*WIDTH+j];
 
-  // }
+      count++;
+  }
 }
 
 void multiply_task(const Task *task, const std::vector<PhysicalRegion> &regions,
@@ -533,7 +541,7 @@ void multiply_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   const TYPE alpha = task_args.alpha;
   const int point = task->index_point.point_data[0];
   const AccessorRO acc_x(regions[0], FID_X);
-  const AccessorRO acc_y(regions[0], FID_Y);
+  const AccessorRO acc_y(regions[0], FID_YT);
   const AccessorWD acc_z(regions[1], FID_Z);
 
   Rect<1> rect = runtime->get_index_space_domain(
@@ -570,7 +578,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   const TYPE alpha = *((const TYPE *)task->args);
 
   const AccessorRO acc_x(regions[0], FID_X);
-  const AccessorRO acc_y(regions[0], FID_Y);
+  const AccessorRO acc_y(regions[0], FID_YT);
   const AccessorRO acc_z(regions[1], FID_Z);
 
   Rect<1> rect_xy = runtime->get_index_space_domain(
