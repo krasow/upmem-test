@@ -87,7 +87,7 @@ int main_kernel1() {
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
   AccessorWD block_acc_z;
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc(WIDTH * HEIGHT  * sizeof(TYPE));
   block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
   // set strides from base accessor
@@ -98,56 +98,84 @@ int main_kernel1() {
   unsigned int curr_row = 0;
   unsigned int curr_col = 0;
 
-  for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
-    //read data
-    Rect<1> temp_rect;
-    temp_rect.lo = 0;
-    temp_rect.hi = WIDTH*HEIGHT;
-    Legion::PointInRectIterator<1> pir_a(temp_rect);
-    Legion::PointInRectIterator<1> pir_b(temp_rect);
-    Legion::PointInRectIterator<1> pir_z(rect); 
-    curr_row = counter/subregion_width + start_row;
-    curr_col = counter%subregion_width+ start_col;
-
-    pir_a += curr_row*WIDTH;
-    pir_b += curr_col*WIDTH;
-    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-
-    //calculation
-    Rect<1> block_rect;
-    block_rect.lo = 0;
-    block_rect.hi = WIDTH-1;
-    TYPE sum=0;
-    // printf("the subregion size")
-    printf("the current row is %u and the current col is %u \n", curr_row, curr_col);
-    for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
-         pir_block++) {
-      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
-
-      sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
-      // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-      //                                   block_acc_y[*pir_block]);
-    }
-
-    printf("\n");
-
-    //write data into temp block
-    block_rect.lo = 0;
-    block_rect.hi = 0;
-    Legion::PointInRectIterator<1> pir_block(block_rect);
-    block_acc_z.write(*pir_block, sum);
-
-    //write data into accessor
-    // pir_z+=rect.lo.value;
-    pir_z+=counter;
-    WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
-
-
-    // curr_row += NR_TASKLETS/subregion_width;
-    // curr_col += NR_TASKLETS;
-    // curr_col %= subregion_width;
+  Rect<1> temp_rect;
+  temp_rect.lo = 0;
+  temp_rect.hi = WIDTH*HEIGHT-1;
+  Legion::PointInRectIterator<1> pir_a(temp_rect);
+  READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * HEIGHT * sizeof(TYPE));
+  unsigned int counter = 0;
+  Rect<1> block_rect;
+  block_rect.lo = 0;
+  block_rect.hi = WIDTH*HEIGHT-1;
+  for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block(); pir_block++) {
+    if(counter%WIDTH==0) printf("\n");
+    printf("%f ", block_acc_x[*pir_block]);
+    counter++;
   }
+
+  pir_a += WIDTH*HEIGHT;
+  READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * HEIGHT * sizeof(TYPE));
+  counter = 0;
+  for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block(); pir_block++) {
+    if(counter%WIDTH==0) printf("\n");
+    printf("%f ", block_acc_x[*pir_block]);
+    counter++;
+  }
+  printf("\n");
+
+
+
+
+//   for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
+//     //read data
+//     Rect<1> temp_rect;
+//     temp_rect.lo = 0;
+//     temp_rect.hi = WIDTH*HEIGHT;
+//     Legion::PointInRectIterator<1> pir_a(temp_rect);
+//     Legion::PointInRectIterator<1> pir_b(temp_rect);
+//     Legion::PointInRectIterator<1> pir_z(rect); 
+//     curr_row = counter/subregion_width + start_row;
+//     curr_col = counter%subregion_width+ start_col;
+
+//     pir_a += curr_row*WIDTH;
+//     pir_b += curr_col*WIDTH;
+//     READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+//     READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+
+//     //calculation
+//     Rect<1> block_rect;
+//     block_rect.lo = 0;
+//     block_rect.hi = WIDTH-1;
+//     TYPE sum=0;
+//     // printf("the subregion size")
+//     printf("the current row is %u and the current col is %u \n", curr_row, curr_col);
+//     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
+//          pir_block++) {
+//       printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
+
+//       sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
+// //       // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
+// //       //                                   block_acc_y[*pir_block]);
+//     }
+
+//     printf("\n");
+
+//     //write data into temp block
+//     block_rect.lo = 0;
+//     block_rect.hi = 0;
+//     Legion::PointInRectIterator<1> pir_block(block_rect);
+//     block_acc_z.write(*pir_block, sum);
+
+//     //write data into accessor
+//     // pir_z+=rect.lo.value;
+//     pir_z+=counter;
+//     WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
+
+
+//     // curr_row += NR_TASKLETS/subregion_width;
+//     // curr_col += NR_TASKLETS;
+//     // curr_col %= subregion_width;
+//   }
 
 
 
