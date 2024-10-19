@@ -100,7 +100,7 @@ int main_kernel1() {
 
   Rect<1> temp_rect;
   temp_rect.lo = 0;
-  temp_rect.hi = WIDTH*HEIGHT-1;
+  temp_rect.hi = WIDTH*HEIGHT*NUM_SUBREGIONS;
   Legion::PointInRectIterator<1> pir_a(temp_rect);
   READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * HEIGHT * sizeof(TYPE));
   unsigned int counter = 0;
