@@ -68,26 +68,28 @@ int main_kernel1() {
   rect.lo = args->rect.lo;
   rect.hi = args->rect.hi;
 
-  unsigned int range = rect.hi.value - rect.lo.value;
+  unsigned int range = rect.hi.value - rect.lo.value + 1;
   unsigned int index = rect.lo.value;
   unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
   unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
   unsigned int subregion_index = index/subregion_size;
-  // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
-  // unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+  unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
+  unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH;
+  start_row += (subregion_index%NUM_SUBREGIONS) * subregion_height;
+  start_col += (subregion_index%NUM_SUBREGIONS) * subregion_width ;
 
 
-  unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT + (subregion_index%NUM_SUBREGIONS) * subregion_height;
-  unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH + (subregion_index%NUM_SUBREGIONS) * subregion_width ;
+  // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT + (subregion_index%NUM_SUBREGIONS) * subregion_height;
+  // unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH + (subregion_index%NUM_SUBREGIONS) * subregion_width ;
 
-  unsigned int end_row = start_row + subregion_height - 1;
-  unsigned int end_col = start_col + subregion_width - 1;
+  // unsigned int end_row = start_row + subregion_height - 1;
+  // unsigned int end_col = start_col + subregion_width - 1;
 
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
   AccessorWD block_acc_z;
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(WIDTH * HEIGHT  * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc(WIDTH * BLOCK_SIZE  * sizeof(TYPE));
   block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
   // set strides from base accessor
@@ -100,7 +102,7 @@ int main_kernel1() {
 
 
 
-  for(unsigned int counter = tasklet_id; counter <= range; counter += NR_TASKLETS){
+  for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
     //read data
     Rect<1> temp_rect;
     temp_rect.lo = 0;
