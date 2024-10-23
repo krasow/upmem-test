@@ -1,4 +1,5 @@
-export CUDA_HOME="/usr/local/cuda"
-export PATH="/home/david/tools/bin:$PATH"
-export LG_RT_DIR="/home/david/legion/runtime"
-source /home/david/tools/upmem/upmem_env.sh simulator
+BASEDIR=$(pwd)/libs
+export PATH="${BASEDIR}/gasnet/release/bin":$PATH
+export LG_RT_DIR="${BASEDIR}/upmem-legion/runtime"
+#export GASNET="${BASEDIR}/libs/gasnet/release"
+source ${BASEDIR}/upmem-2024.1.0-Linux-x86_64/upmem_env.sh simulator 
