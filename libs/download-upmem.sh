@@ -1,3 +1,4 @@
+cd libs
 # upmem runtime
 wget http://sdk-releases.upmem.com/2024.1.0/ubuntu_22.04/upmem-2024.1.0-Linux-x86_64.tar.gz
 # wget http://sdk-releases.upmem.com/2024.1.0/rocky_8/upmem-2024.1.0-Linux-x86_64.tar.gz
@@ -71,3 +72,4 @@ typedef unsigned int wchar_t;
 #endif /* _DPUSYSCORE_STDDEF_H_ */
 EOF
 
+cd ..
