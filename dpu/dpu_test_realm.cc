@@ -56,6 +56,8 @@ int main_kernel1() {
            args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
            args->acc_z.ptr(args->rect.lo));
 
+    printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect.lo.value);
+
 #ifdef INT32
     printf(" alpha = %d \n", args->alpha);
 #elif DOUBLE
@@ -80,6 +82,26 @@ int main_kernel1() {
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
   block_acc_z.accessor.strides = args->acc_z.accessor.strides;
+
+
+#ifdef PRINT_UPMEM
+  Rect<1> temp_rect;
+  temp_rect.lo = 0;
+  temp_rect.hi = 256 - 1;
+  unsigned int range = temp_rect.hi.value - temp_rect.lo.value + 1;
+  Legion::PointInRectIterator<1> pir_a(temp_rect);
+  READ_BLOCK(*pir_a, args->acc_x, block_acc_x, 256 * sizeof(TYPE));
+  unsigned int counter = 0;
+  Rect<1> block_rect;
+  block_rect.lo = 0;
+  block_rect.hi = 256-1;
+  for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block(); pir_block++) {
+    if(counter%16==0) printf("\n");
+    printf("%f ", block_acc_x[*pir_block]);
+    counter++;
+  }
+#endif
+
 
   // iterator through all elements
   for (Legion::PointInRectIterator<1> pir(rect); pir();
