@@ -2,6 +2,7 @@
 ```bash
 git submodule init 
 git submodule update
+source libs/download-upmem.sh
 ```
 # ENV
 ```bash
