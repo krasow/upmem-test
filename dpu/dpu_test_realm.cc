@@ -53,6 +53,7 @@ int main_kernel1() {
   printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect.lo.value);
   printf("the low value of rect_x is %d and the high value of rect_x is %d\n", args->rect_x.lo.value, args->rect_x.hi.value);
   printf("the low value of rect_y is %d and the high value of rect_y is %d\n", args->rect_y.lo.value, args->rect_y.hi.value);
+  printf("the number of subregions is %d\n", args->num_subregions);
 
 #endif
 
@@ -62,10 +63,12 @@ int main_kernel1() {
   rect.hi = args->rect.hi;
 
   const int w = args->w;
+  const int num_subregions = args->num_subregions;
+
 
   unsigned int range = rect.hi.value - rect.lo.value + 1;
-  unsigned int subregion_width = w/NUM_SUBREGIONS;
-  unsigned int subregion_height = w/NUM_SUBREGIONS;
+  unsigned int subregion_width = w/num_subregions;
+  unsigned int subregion_height = w/num_subregions;
   unsigned int start_row = args->rect_x.lo.value/w;
   unsigned int start_col = args->rect_y.lo.value/w;
 
@@ -88,10 +91,10 @@ int main_kernel1() {
     //read data
     Rect<1> temp_rect;
     temp_rect.lo = 0;
-    temp_rect.hi = w*HEIGHT*NUM_SUBREGIONS;
+    temp_rect.hi = w*w*num_subregions;
     Legion::PointInRectIterator<1> pir_a(temp_rect);
     Legion::PointInRectIterator<1> pir_b(temp_rect);
-    Legion::PointInRectIterator<1> pir_z(rect); 
+    Legion::PointInRectIterator<1> pir_z(rect);
     curr_row = counter/subregion_width + start_row;
     curr_col = counter%subregion_width+ start_col;
 

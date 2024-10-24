@@ -53,8 +53,14 @@ enum TaskIDs {
 
 typedef struct {
   int w;
+  int num_subregions;
   Realm::Upmem::Kernel *kernel;
 } DPU_TASK_ARGS;
+
+typedef struct {
+  int w;
+  int num_subregions;
+} CHECK_TASK_ARGS;
 
 // for the device
 #define DPU_LAUNCH_BINARY "dpu/dpu_test_realm.up.o"
@@ -96,9 +102,9 @@ void top_level_task(const Task *task,
   kern->load();
 
   int w = WIDTH;
-  int h = HEIGHT;
+  // int h = HEIGHT;
 
-  int num_elements = w*h;
+  int num_elements = w*w;
   int num_subregions = NUM_SUBREGIONS;
   int soa_flag = 0;
 
@@ -116,12 +122,12 @@ void top_level_task(const Task *task,
         soa_flag = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-w"))
         w = atoi(command_args.argv[++i]);
-      if (!strcmp(command_args.argv[i], "-h"))
-        h = atoi(command_args.argv[++i]);
+      // if (!strcmp(command_args.argv[i], "-h"))
+      //   h = atoi(command_args.argv[++i]);
     }
   }
 
-  num_elements = w*h;
+  num_elements = w*w;
 
   printf("Running mat multiplication for %d elements...\n", num_elements);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
@@ -367,6 +373,7 @@ void top_level_task(const Task *task,
   DPU_TASK_ARGS args;
   args.kernel = kern;
   args.w = w;
+  args.num_subregions = num_subregions;
   // We launch the subtasks for performing the daxpy computation
   // in a similar way to the initialize field tasks.  Note we
   // again make use of two RegionRequirements which use a
@@ -396,8 +403,11 @@ void top_level_task(const Task *task,
   // all operating on subregions, Legion will correctly compute
   // data dependences on all the subtasks that generated the
   // data in these two regions.
+  CHECK_TASK_ARGS c_args;
+  c_args.num_subregions = num_subregions;
+  c_args.w = w;
   TaskLauncher check_launcher(CHECK_TASK_ID,
-                              TaskArgument(&w, sizeof(int)));
+                              TaskArgument(&c_args, sizeof(CHECK_TASK_ARGS)));
   check_launcher.add_region_requirement(RegionRequirement(input_lr_X, READ_ONLY, EXCLUSIVE, input_lr_X));
   check_launcher.region_requirements[0].add_field(FID_X);
   check_launcher.add_region_requirement(RegionRequirement(input_lr_Y, READ_ONLY, EXCLUSIVE, input_lr_Y));
@@ -517,6 +527,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
   const int point = task->index_point.point_data[0];
   const int w = task_args.w;
+  const int num_subregions = task_args.num_subregions;
 
   const AccessorRO acc_y(regions[1], FID_Y);
   const AccessorRO acc_x(regions[0], FID_X);
@@ -535,6 +546,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   {
     DPU_LAUNCH_ARGS args;
     args.w = w;
+    args.num_subregions = num_subregions;
     args.rect = rect;
     args.rect_x = rect_x;
     args.rect_y = rect_y;
@@ -562,8 +574,14 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect_xy = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
 
-  const int w = *((const int *)task->args);
+  // const int w = *((const int *)task->args);
+  CHECK_TASK_ARGS task_args = *((CHECK_TASK_ARGS *)task->args);
+  const int w = task_args.w;
+  const int num_subregions = task_args.num_subregions;
 #ifdef PRINT_UPMEM
+
+  printf("within the check task, the number of subregions is %d\n", num_subregions);
+
   int counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
     if(counter % w == 0) printf("\n");
@@ -586,17 +604,16 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   bool all_passed = true;
   unsigned int count = 0;
   size_t errors = 0;
-  unsigned int subregion_size = w*w/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  unsigned int subregion_size = w*w/(num_subregions * num_subregions);
   for (PointInRectIterator<1> pir(rect_z); pir(); pir++) {
     TYPE received = acc_z[*pir];
     TYPE expected = 0;
 
     unsigned int subregion_index = count / (subregion_size);
     unsigned int within_subregion_index = count % (subregion_size);
-    unsigned int subregion_width = w/NUM_SUBREGIONS;
-    // unsigned int subregion_height = w/NUM_SUBREGIONS;
-    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * w;
-    unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
+    unsigned int subregion_width = w/num_subregions;
+    unsigned int start_row = (subregion_index/num_subregions) * w;
+    unsigned int start_col = (subregion_index%num_subregions) * subregion_width;
 
 
     int row = start_row + within_subregion_index/subregion_width;
