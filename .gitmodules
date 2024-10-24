@@ -1,0 +1,6 @@
+[submodule "libs/SimplePIM"]
+	path = libs/SimplePIM
+	url = https://github.com/CMU-SAFARI/SimplePIM
+[submodule "libs/upmem-legion"]
+	path = libs/upmem-legion
+	url = https://github.com/PrescienceLab/upmem-legion

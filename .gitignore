@@ -1,4 +1,6 @@
-upmem_test
+upmem_legion
+upmem-*-Linux-*
+SimplePIM
 *.o
 *.out
 *.a
