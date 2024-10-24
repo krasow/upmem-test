@@ -28,7 +28,6 @@ extern "C" {
 #include <common.h>
 
 #define BLOCK_SIZE 1
-// #define NUM_SUBREGIONS 2
 
 typedef struct __DPU_LAUNCH_ARGS {
   char paddd[512];
@@ -52,14 +51,8 @@ int main_kernel1() {
 
 #ifdef PRINT_UPMEM
   printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect.lo.value);
-
-  // if (tasklet_id == 0) {
-  //   printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
-  //          "%p...",
-  //          args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-  //          args->acc_z.ptr(args->rect.lo));
-  // }
-
+  printf("the low value of rect_x is %d and the high value of rect_x is %d\n", args->rect_x.lo.value, args->rect_x.hi.value);
+  printf("the low value of rect_y is %d and the high value of rect_y is %d\n", args->rect_y.lo.value, args->rect_y.hi.value);
 
 #endif
 
@@ -69,20 +62,10 @@ int main_kernel1() {
   rect.hi = args->rect.hi;
 
   unsigned int range = rect.hi.value - rect.lo.value + 1;
-  unsigned int index = rect.lo.value;
-  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
   unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
-  unsigned int subregion_index = index/subregion_size;
   unsigned int start_row = args->rect_x.lo.value/WIDTH;
   unsigned int start_col = args->rect_y.lo.value/WIDTH;
-  // start_row += (subregion_index%NUM_SUBREGIONS) * subregion_height;
-  // start_col += (subregion_index%NUM_SUBREGIONS) * subregion_width ;
-
-
-  // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT + (subregion_index%NUM_SUBREGIONS) * subregion_height;
-  // unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH + (subregion_index%NUM_SUBREGIONS) * subregion_width ;
-
 
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
@@ -97,11 +80,6 @@ int main_kernel1() {
 
   unsigned int curr_row = 0;
   unsigned int curr_col = 0;
-
-
-  printf("the low value of rect_x is %d and the high value of rect_x is %d\n", args->rect_x.lo.value, args->rect_x.hi.value);
-  printf("the low value of rect_y is %d and the high value of rect_y is %d\n", args->rect_y.lo.value, args->rect_y.hi.value);
-
 
 
   for(unsigned int counter = tasklet_id; counter < range; counter += NR_TASKLETS){
@@ -129,29 +107,24 @@ int main_kernel1() {
     printf("the current row is %u and the current col is %u \n", curr_row, curr_col);
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
-      // printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
-
+#ifdef PRINT_UPMEM
+      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
+#endif
       sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
-//       // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-//       //                                   block_acc_y[*pir_block]);
     }
 
-    // printf("\n the sum is %f\n", sum);
 
+#ifdef PRINT_UPMEM
+    printf("\n the sum is %f\n", sum);
+#endif
     //write data into temp block
     block_rect.lo = 0;
     block_rect.hi = 0;
     Legion::PointInRectIterator<1> pir_block(block_rect);
     block_acc_z.write(*pir_block, sum);
 
-
     pir_z+=counter;
     WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
-
-
   }
-
-
-
   return 0;
 }

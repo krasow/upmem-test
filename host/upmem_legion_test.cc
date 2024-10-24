@@ -88,8 +88,6 @@ bool compare_double(double a, double b) {
 
 bool compare_int(int a, int b) { return a == b; }
 
-// #define NUM_SUBREGIONS 2
-
 void print_mat(TYPE *ptr, int num)
 {
   // printf("printing a matrix x\n");
@@ -336,9 +334,6 @@ void top_level_task(const Task *task,
   printf("Attach array, init done, time %f\n", end_init - start_init);
 
 
-
-
-  // 2*2 - 1
   Rect<1> color_bounds_mat(0, num_subregions*num_subregions - 1);
   IndexSpace color_is_mat = runtime->create_index_space(ctx, color_bounds_mat);
   IndexPartition ip_mat = runtime->create_equal_partition(ctx, is_xy, color_is_mat);
@@ -367,11 +362,9 @@ void top_level_task(const Task *task,
   // the same as example 02.
   
 
-  const TYPE alpha = RANDOM_NUMBER;
   double start_t = get_cur_time();
 
   DPU_TASK_ARGS args;
-  args.alpha = alpha;
   args.kernel = kern;
   // We launch the subtasks for performing the daxpy computation
   // in a similar way to the initialize field tasks.  Note we
@@ -403,7 +396,7 @@ void top_level_task(const Task *task,
   // data dependences on all the subtasks that generated the
   // data in these two regions.
   TaskLauncher check_launcher(CHECK_TASK_ID,
-                              TaskArgument(&alpha, sizeof(alpha)));
+                              TaskArgument(NULL, 0));
   check_launcher.add_region_requirement(RegionRequirement(input_lr_X, READ_ONLY, EXCLUSIVE, input_lr_X));
   check_launcher.region_requirements[0].add_field(FID_X);
   check_launcher.add_region_requirement(RegionRequirement(input_lr_Y, READ_ONLY, EXCLUSIVE, input_lr_Y));
@@ -444,7 +437,6 @@ void init_field_task(const Task *task,
   const int point = task->index_point.point_data[0];
   printf("Initializing field %d for block %d...\n", fid, point);
   int num_subregions = *((const int *)task->local_args);
-  // printf("the argument value that I got is %d \n", num_subregions);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -474,10 +466,6 @@ void init_field_task(const Task *task,
     }
   }
 
-  // for (PointInRectIterator<1> pir(rect); pir(); pir++)
-  //   acc[*pir] = RANDOM_NUMBER;
-
-
   delete[] all_iters;
 }
 
@@ -492,7 +480,6 @@ void init_field_task_transpose(const Task *task,
   const int point = task->index_point.point_data[0];
   printf("Initializing transpose field %d for block %d...\n", fid, point);
   int num_subregions = *((const int *)task->local_args);
-  // printf("the argument value that I got is %d \n", num_subregions);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -508,7 +495,7 @@ void init_field_task_transpose(const Task *task,
   }else{
     int size_duplication = HEIGHT*WIDTH;
     Rect<1> rect_ori;
-    //? there would be multiple threads reading the same data, will it cause some problem
+    //TODO: test if multiple threads read
     rect_ori.lo = Point<1>(0);
     rect_ori.hi = Point<1>(HEIGHT*WIDTH - 1);
     PointInRectIterator<1> pir_ori(rect_ori);
@@ -526,7 +513,6 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   assert(task->regions.size() == 3);
   assert(task->arglen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
-  const TYPE alpha = task_args.alpha;
   const int point = task->index_point.point_data[0];
 
   const AccessorRO acc_y(regions[1], FID_Y);
@@ -540,19 +526,11 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect_y = runtime->get_index_space_domain(
       ctx, task->regions[1].region.get_index_space());
   printf(
-      "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
+      "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...\n",
       point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
-#ifdef INT32
-  printf(" alpha = %d \n", alpha);
-#elif DOUBLE
-  printf(" alpha = %f \n", alpha);
-#endif
 
   {
     DPU_LAUNCH_ARGS args;
-    // args.width = WIDTH;
-    // args.height = HEIGHT;
-    args.alpha = alpha;
     args.rect = rect;
     args.rect_x = rect_x;
     args.rect_y = rect_y;
@@ -569,8 +547,6 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
                 Context ctx, Runtime *runtime) {
   assert(regions.size() == 3);
   assert(task->regions.size() == 3);
-  assert(task->arglen == sizeof(TYPE));
-  const TYPE alpha = *((const TYPE *)task->args);
 
   const AccessorRO acc_x(regions[0], FID_X);
   const AccessorRO acc_y(regions[1], FID_Y);
@@ -582,6 +558,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect_xy = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
 
+#ifdef PRINT_UPMEM
   int counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
     if(counter % WIDTH == 0) printf("\n");
@@ -599,15 +576,13 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   }
   
   printf("\n");
-  // const void *ptr = acc_z.ptr(rect_z.lo);
-  // printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
-        //  acc_x.ptr(rect_xy.lo), acc_y.ptr(rect_xy.lo), ptr);
+#endif
+
   bool all_passed = true;
   unsigned int count = 0;
   size_t errors = 0;
   unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   for (PointInRectIterator<1> pir(rect_z); pir(); pir++) {
-    // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
     TYPE received = acc_z[*pir];
     TYPE expected = 0;
 
@@ -625,22 +600,15 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     PointInRectIterator<1> pir_x(rect_xy);
     PointInRectIterator<1> pir_y(rect_xy);
 
+    //TODO: should support `+=`
     for(int i=0; i<row*WIDTH; i++) pir_x++;
     for(int i=0; i<col*HEIGHT; i++) pir_y++;
-    // pir_x += row*WIDTH;
-    // pir_y += col*HEIGHT;
 
     for(int i=0; i<WIDTH; i++){
-      // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
-
       expected += acc_x[*pir_x] * acc_y[*pir_y];
       pir_x++;
       pir_y++;
-      // count++;
     }    
-    // PRINT_EXPECTED(expected, received);
-    // printf("location: %ld\n", count);
-    // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
     // Probably shouldn't check for floating point equivalence but
     // the order of operations are the same should they should
     // be bitwise equal.
@@ -651,7 +619,6 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
       errors++;
     }
     count++;
-    // count+=32;
   }
   if (all_passed)
     printf("SUCCESS!\n");
