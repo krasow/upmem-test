@@ -535,6 +535,10 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
 
   Rect<1> rect = runtime->get_index_space_domain(
       ctx, task->regions[2].region.get_index_space());
+  Rect<1> rect_x = runtime->get_index_space_domain(
+      ctx, task->regions[0].region.get_index_space());
+  Rect<1> rect_y = runtime->get_index_space_domain(
+      ctx, task->regions[1].region.get_index_space());
   printf(
       "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
       point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
@@ -550,6 +554,8 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     // args.height = HEIGHT;
     args.alpha = alpha;
     args.rect = rect;
+    args.rect_x = rect_x;
+    args.rect_y = rect_y;
     args.acc_y = acc_y;
     args.acc_x = acc_x;
     args.acc_z = acc_z;
@@ -592,6 +598,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     counter++;
   }
   
+  printf("\n");
   // const void *ptr = acc_z.ptr(rect_z.lo);
   // printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
         //  acc_x.ptr(rect_xy.lo), acc_y.ptr(rect_xy.lo), ptr);

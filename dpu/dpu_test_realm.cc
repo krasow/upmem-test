@@ -74,17 +74,15 @@ int main_kernel1() {
   unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
   unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
   unsigned int subregion_index = index/subregion_size;
-  unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
-  unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH;
-  start_row += (subregion_index%NUM_SUBREGIONS) * subregion_height;
-  start_col += (subregion_index%NUM_SUBREGIONS) * subregion_width ;
+  unsigned int start_row = args->rect_x.lo.value/WIDTH;
+  unsigned int start_col = args->rect_y.lo.value/WIDTH;
+  // start_row += (subregion_index%NUM_SUBREGIONS) * subregion_height;
+  // start_col += (subregion_index%NUM_SUBREGIONS) * subregion_width ;
 
 
   // unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT + (subregion_index%NUM_SUBREGIONS) * subregion_height;
   // unsigned int start_col = (subregion_index/NUM_SUBREGIONS) * WIDTH + (subregion_index%NUM_SUBREGIONS) * subregion_width ;
 
-  // unsigned int end_row = start_row + subregion_height - 1;
-  // unsigned int end_col = start_col + subregion_width - 1;
 
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
@@ -99,6 +97,10 @@ int main_kernel1() {
 
   unsigned int curr_row = 0;
   unsigned int curr_col = 0;
+
+
+  printf("the low value of rect_x is %d and the high value of rect_x is %d\n", args->rect_x.lo.value, args->rect_x.hi.value);
+  printf("the low value of rect_y is %d and the high value of rect_y is %d\n", args->rect_y.lo.value, args->rect_y.hi.value);
 
 
 
@@ -127,14 +129,14 @@ int main_kernel1() {
     printf("the current row is %u and the current col is %u \n", curr_row, curr_col);
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
-      printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
+      // printf("(%f, %f) ", block_acc_x[*pir_block] ,block_acc_y[*pir_block]);
 
       sum += block_acc_x[*pir_block] * block_acc_y[*pir_block];
 //       // block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
 //       //                                   block_acc_y[*pir_block]);
     }
 
-    printf("\n the sum is %f\n", sum);
+    // printf("\n the sum is %f\n", sum);
 
     //write data into temp block
     block_rect.lo = 0;
@@ -142,15 +144,11 @@ int main_kernel1() {
     Legion::PointInRectIterator<1> pir_block(block_rect);
     block_acc_z.write(*pir_block, sum);
 
-    //write data into accessor
-    // pir_z+=rect.lo.value;
+
     pir_z+=counter;
     WRITE_BLOCK(*pir_z, args->acc_z, block_acc_z, sizeof(TYPE));
 
 
-    // curr_row += NR_TASKLETS/subregion_width;
-    // curr_col += NR_TASKLETS;
-    // curr_col %= subregion_width;
   }
 
 
