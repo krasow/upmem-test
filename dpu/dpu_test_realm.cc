@@ -61,17 +61,19 @@ int main_kernel1() {
   rect.lo = args->rect.lo;
   rect.hi = args->rect.hi;
 
+  const int w = args->w;
+
   unsigned int range = rect.hi.value - rect.lo.value + 1;
-  unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
-  unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
-  unsigned int start_row = args->rect_x.lo.value/WIDTH;
-  unsigned int start_col = args->rect_y.lo.value/WIDTH;
+  unsigned int subregion_width = w/NUM_SUBREGIONS;
+  unsigned int subregion_height = w/NUM_SUBREGIONS;
+  unsigned int start_row = args->rect_x.lo.value/w;
+  unsigned int start_col = args->rect_y.lo.value/w;
 
   AccessorRO block_acc_y;
   AccessorRO block_acc_x;
   AccessorWD block_acc_z;
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(WIDTH * BLOCK_SIZE  * sizeof(TYPE));
-  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc(w * BLOCK_SIZE  * sizeof(TYPE));
+  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * w * sizeof(TYPE));
   block_acc_z.accessor.base = (uintptr_t)mem_alloc(sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
@@ -86,22 +88,22 @@ int main_kernel1() {
     //read data
     Rect<1> temp_rect;
     temp_rect.lo = 0;
-    temp_rect.hi = WIDTH*HEIGHT*NUM_SUBREGIONS;
+    temp_rect.hi = w*HEIGHT*NUM_SUBREGIONS;
     Legion::PointInRectIterator<1> pir_a(temp_rect);
     Legion::PointInRectIterator<1> pir_b(temp_rect);
     Legion::PointInRectIterator<1> pir_z(rect); 
     curr_row = counter/subregion_width + start_row;
     curr_col = counter%subregion_width+ start_col;
 
-    pir_a += curr_row*WIDTH;
-    pir_b += curr_col*WIDTH;
-    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, WIDTH * BLOCK_SIZE* sizeof(TYPE));
-    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, WIDTH * BLOCK_SIZE* sizeof(TYPE));
+    pir_a += curr_row*w;
+    pir_b += curr_col*w;
+    READ_BLOCK(*pir_a, args->acc_x, block_acc_x, w * BLOCK_SIZE* sizeof(TYPE));
+    READ_BLOCK(*pir_b, args->acc_y, block_acc_y, w * BLOCK_SIZE* sizeof(TYPE));
 
     //calculation
     Rect<1> block_rect;
     block_rect.lo = 0;
-    block_rect.hi = WIDTH-1;
+    block_rect.hi = w-1;
     TYPE sum=0;
     // printf("the subregion size")
     printf("the current row is %u and the current col is %u \n", curr_row, curr_col);

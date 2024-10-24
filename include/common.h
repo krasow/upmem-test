@@ -39,6 +39,7 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 
 typedef struct DPU_LAUNCH_ARGS{
+  int w;
   Rect<1> rect;
   Rect<1> rect_x;
   Rect<1> rect_y;

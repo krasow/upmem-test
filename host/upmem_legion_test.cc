@@ -52,7 +52,7 @@ enum TaskIDs {
 };
 
 typedef struct {
-  TYPE alpha;
+  int w;
   Realm::Upmem::Kernel *kernel;
 } DPU_TASK_ARGS;
 
@@ -88,16 +88,6 @@ bool compare_double(double a, double b) {
 
 bool compare_int(int a, int b) { return a == b; }
 
-void print_mat(TYPE *ptr, int num)
-{
-  // printf("printing a matrix x\n");
-  for(int i=0; i<num; i++){
-    if(i%WIDTH == 0) printf("\n");
-    printf("%f ", ptr[i]);
-  }
-  printf("\n");
-}
-
 void top_level_task(const Task *task,
                     const std::vector<PhysicalRegion> &regions, Context ctx,
                     Runtime *runtime) {
@@ -105,7 +95,10 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int num_elements = WIDTH*HEIGHT;
+  int w = WIDTH;
+  int h = HEIGHT;
+
+  int num_elements = w*h;
   int num_subregions = NUM_SUBREGIONS;
   int soa_flag = 0;
 
@@ -121,8 +114,15 @@ void top_level_task(const Task *task,
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
         soa_flag = atoi(command_args.argv[++i]);
+      if (!strcmp(command_args.argv[i], "-w"))
+        w = atoi(command_args.argv[++i]);
+      if (!strcmp(command_args.argv[i], "-h"))
+        h = atoi(command_args.argv[++i]);
     }
   }
+
+  num_elements = w*h;
+
   printf("Running mat multiplication for %d elements...\n", num_elements);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
   
@@ -314,7 +314,7 @@ void top_level_task(const Task *task,
 
   printf("the starting point of the init task\n");
   IndexLauncher init_launcher_X(INIT_FIELD_TASK_ID, color_is,
-                              TaskArgument(NULL, 0), arg_map_init);
+                              TaskArgument(&w, sizeof(int)), arg_map_init);
 
   init_launcher_X.add_region_requirement(RegionRequirement(
       input_lp_X_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_X));
@@ -323,7 +323,7 @@ void top_level_task(const Task *task,
   
 
   IndexLauncher init_launcher_Y(INIT_FIELD_TRANSPOSE_TASK_ID, color_is,
-                              TaskArgument(NULL, 0), arg_map_init);
+                              TaskArgument(&w, sizeof(int)), arg_map_init);
   init_launcher_Y.add_region_requirement(RegionRequirement(
       input_lp_Y_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_Y));
   init_launcher_Y.region_requirements[0].add_field(FID_Y);
@@ -366,6 +366,7 @@ void top_level_task(const Task *task,
 
   DPU_TASK_ARGS args;
   args.kernel = kern;
+  args.w = w;
   // We launch the subtasks for performing the daxpy computation
   // in a similar way to the initialize field tasks.  Note we
   // again make use of two RegionRequirements which use a
@@ -396,7 +397,7 @@ void top_level_task(const Task *task,
   // data dependences on all the subtasks that generated the
   // data in these two regions.
   TaskLauncher check_launcher(CHECK_TASK_ID,
-                              TaskArgument(NULL, 0));
+                              TaskArgument(&w, sizeof(int)));
   check_launcher.add_region_requirement(RegionRequirement(input_lr_X, READ_ONLY, EXCLUSIVE, input_lr_X));
   check_launcher.region_requirements[0].add_field(FID_X);
   check_launcher.add_region_requirement(RegionRequirement(input_lr_Y, READ_ONLY, EXCLUSIVE, input_lr_Y));
@@ -437,6 +438,7 @@ void init_field_task(const Task *task,
   const int point = task->index_point.point_data[0];
   printf("Initializing field %d for block %d...\n", fid, point);
   int num_subregions = *((const int *)task->local_args);
+  const int w = *((const int *)task->args);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -448,7 +450,7 @@ void init_field_task(const Task *task,
   
 
   PointInRectIterator<1> *all_iters = new PointInRectIterator<1>[num_subregions];
-  int size_duplication = HEIGHT*WIDTH/num_subregions;
+  int size_duplication = w*w/num_subregions;
   for(int i=0; i<num_subregions; i++){
       PointInRectIterator<1> pir(rect);
       all_iters[i] = pir;
@@ -479,7 +481,8 @@ void init_field_task_transpose(const Task *task,
   FieldID fid = *(task->regions[0].privilege_fields.begin());
   const int point = task->index_point.point_data[0];
   printf("Initializing transpose field %d for block %d...\n", fid, point);
-  int num_subregions = *((const int *)task->local_args);
+
+  const int w = *((const int *)task->args);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -493,11 +496,10 @@ void init_field_task_transpose(const Task *task,
     for (PointInRectIterator<1> pir(rect); pir(); pir++)
       acc[*pir] = RANDOM_NUMBER;
   }else{
-    int size_duplication = HEIGHT*WIDTH;
     Rect<1> rect_ori;
     //TODO: test if multiple threads read
     rect_ori.lo = Point<1>(0);
-    rect_ori.hi = Point<1>(HEIGHT*WIDTH - 1);
+    rect_ori.hi = Point<1>(w*w - 1);
     PointInRectIterator<1> pir_ori(rect_ori);
     for (PointInRectIterator<1> pir(rect); pir(); pir++){
       acc[*pir] = acc[*pir_ori];
@@ -514,6 +516,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   assert(task->arglen == sizeof(DPU_TASK_ARGS));
   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
   const int point = task->index_point.point_data[0];
+  const int w = task_args.w;
 
   const AccessorRO acc_y(regions[1], FID_Y);
   const AccessorRO acc_x(regions[0], FID_X);
@@ -531,6 +534,7 @@ void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
 
   {
     DPU_LAUNCH_ARGS args;
+    args.w = w;
     args.rect = rect;
     args.rect_x = rect_x;
     args.rect_y = rect_y;
@@ -558,10 +562,11 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   Rect<1> rect_xy = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
 
+  const int w = *((const int *)task->args);
 #ifdef PRINT_UPMEM
   int counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
-    if(counter % WIDTH == 0) printf("\n");
+    if(counter % w == 0) printf("\n");
     printf("%f ", acc_x[*pir_xy]);
     counter++;
   }
@@ -570,7 +575,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
 
   counter = 0;
   for(PointInRectIterator<1> pir_xy(rect_xy); pir_xy(); pir_xy++){
-    if(counter % WIDTH == 0) printf("\n");
+    if(counter % w == 0) printf("\n");
     printf("%f ", acc_y[*pir_xy]);
     counter++;
   }
@@ -581,16 +586,16 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   bool all_passed = true;
   unsigned int count = 0;
   size_t errors = 0;
-  unsigned int subregion_size = WIDTH*HEIGHT/(NUM_SUBREGIONS * NUM_SUBREGIONS);
+  unsigned int subregion_size = w*w/(NUM_SUBREGIONS * NUM_SUBREGIONS);
   for (PointInRectIterator<1> pir(rect_z); pir(); pir++) {
     TYPE received = acc_z[*pir];
     TYPE expected = 0;
 
     unsigned int subregion_index = count / (subregion_size);
     unsigned int within_subregion_index = count % (subregion_size);
-    unsigned int subregion_width = WIDTH/NUM_SUBREGIONS;
-    unsigned int subregion_height = HEIGHT/NUM_SUBREGIONS;
-    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * HEIGHT;
+    unsigned int subregion_width = w/NUM_SUBREGIONS;
+    // unsigned int subregion_height = w/NUM_SUBREGIONS;
+    unsigned int start_row = (subregion_index/NUM_SUBREGIONS) * w;
     unsigned int start_col = (subregion_index%NUM_SUBREGIONS) * subregion_width;
 
 
@@ -601,10 +606,10 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
     PointInRectIterator<1> pir_y(rect_xy);
 
     //TODO: should support `+=`
-    for(int i=0; i<row*WIDTH; i++) pir_x++;
-    for(int i=0; i<col*HEIGHT; i++) pir_y++;
+    for(int i=0; i<row*w; i++) pir_x++;
+    for(int i=0; i<col*w; i++) pir_y++;
 
-    for(int i=0; i<WIDTH; i++){
+    for(int i=0; i<w; i++){
       expected += acc_x[*pir_x] * acc_y[*pir_y];
       pir_x++;
       pir_y++;
