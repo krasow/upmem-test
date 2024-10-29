@@ -49,34 +49,27 @@ int main(void) { return kernels[args->kernel](); }
 int main_kernel1() {
   unsigned int tasklet_id = me();
 
-#if 1
-  if (tasklet_id == 0) {
-    printf("DEVICE:::: Running mat multiplication with xptr %p, y_ptr %p, z_ptr "
-           "%p...",
-           args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-           args->acc_z.ptr(args->rect.lo));
+#ifdef PRINT_UPMEM
+  printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d and %d\n", tasklet_id, args->rect.lo.values[0], args->rect.lo.values[1]);
+  printf("the low value of rect_x is %d and %d and the high value of rect_x is %d and %d\n", args->rect_x.lo.values[0], args->rect_x.lo.values[1], args->rect_x.hi.values[0], args->rect_x.hi.values[1]);
+  printf("the low value of rect_y is %d and %d and the high value of rect_y is %d and %d\n", args->rect_y.lo.values[0], args->rect_y.lo.values[1], args->rect_y.hi.values[0], args->rect_y.hi.values[1]);
+  printf("the number of subregions is %d\n", args->num_subregions);
 
-#ifdef INT32
-    printf(" alpha = %d \n", args->alpha);
-#elif DOUBLE
-    printf(" alpha = %f \n", args->alpha);
-#endif
-  }
 #endif
 
-  Rect<2> rect;
-  rect.lo.values[0] = args->rect.lo.values[0];
-  rect.lo.values[1] = args->rect.lo.values[1];
+  // Rect<2> rect;
+  // rect.lo.values[0] = args->rect.lo.values[0];
+  // rect.lo.values[1] = args->rect.lo.values[1];
 
-  rect.hi.values[0] = args->rect.hi.values[0];
-  rect.hi.values[1] = args->rect.hi.values[1];
+  // rect.hi.values[0] = args->rect.hi.values[0];
+  // rect.hi.values[1] = args->rect.hi.values[1];
 
-  AccessorRO block_acc_y;
-  AccessorRO block_acc_x;
-  AccessorWD block_acc_z;
+  // AccessorRO block_acc_y;
+  // AccessorRO block_acc_x;
+  // AccessorWD block_acc_z;
 
   // set base pointer for the new block accessors
-  printf("%d\n", BLOCK_SIZE * WIDTH * sizeof(TYPE));
+  // printf("%d\n", BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));
   // block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * WIDTH * sizeof(TYPE));

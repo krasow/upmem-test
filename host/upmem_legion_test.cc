@@ -46,14 +46,21 @@ using namespace Legion;
 enum TaskIDs {
   TOP_LEVEL_TASK_ID,
   INIT_FIELD_TASK_ID,
+  INIT_FIELD_TRANSPOSE_TASK_ID,
   DAXPY_TASK_ID,
   CHECK_TASK_ID,
 };
 
 typedef struct {
-  TYPE alpha;
+  int w;
+  int num_subregions;
   Realm::Upmem::Kernel *kernel;
 } DPU_TASK_ARGS;
+
+typedef struct {
+  int w;
+  int num_subregions;
+} CHECK_TASK_ARGS;
 
 // for the device
 #define DPU_LAUNCH_BINARY "dpu/dpu_test_realm.up.o"
@@ -94,12 +101,10 @@ void top_level_task(const Task *task,
   // the binary needs to be loaded before any memory operations
   kern->load();
 
-  int elems_width = WIDTH;
-  int num_subregions = 32;
+  int w = WIDTH;
+  int num_elements = w*w;
+  int num_subregions = NUM_SUBREGIONS;
   int soa_flag = 0;
-
-  // int width = 32;
-  // int height = 32;
   // See if we have any command line arguments to parse
   // Note we now have a new command line parameter which specifies
   // how many subregions we should make.
@@ -107,85 +112,112 @@ void top_level_task(const Task *task,
     const InputArgs &command_args = Runtime::get_input_args();
     for (int i = 1; i < command_args.argc; i++) {
       if (!strcmp(command_args.argv[i], "-n"))
-        elems_width = atoi(command_args.argv[++i]);
+        num_elements = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-b"))
         num_subregions = atoi(command_args.argv[++i]);
       if (!strcmp(command_args.argv[i], "-s"))
         soa_flag = atoi(command_args.argv[++i]);
-      // if (!strcmp(command_args.argv[i], "-w"))
-      //   width = atoi(command_args.argv[++i]);
-      // if (!strcmp(command_args.argv[i], "-h"))
-      //   height = atoi(command_args.argv[++i]); 
+      if (!strcmp(command_args.argv[i], "-w"))
+        w = atoi(command_args.argv[++i]);
     }
   }
-  printf("Running mat multiplication for %d elements...\n", elems_width);
+
+  num_elements = w*w;
+  int num_elements_xy = num_subregions * num_elements;
+
+  printf("Running mat multiplication for %d elements...\n", num_elements);
   printf("Partitioning data into %d sub-regions...\n", num_subregions);
 
   // Create our logical regions using the same schemas as earlier examples
-  Rect<2> elem_rect(Point<2>(0,0), Point<2>(elems_width - 1, elems_width - 1));
-
-  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[0], elem_rect.hi.values[0]);
-  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[1], elem_rect.hi.values[1]);
+  //creating two separate index spaces for xy and z
+  Rect<2> elem_rect_xy(Point<2>(0, 0), Point<2>(w*num_subregions - 1, w -1));
+  IndexSpace is_xy = runtime->create_index_space(ctx, elem_rect_xy);
+  runtime->attach_name(is_xy, "is_xy");
+  Rect<2> elem_rect(Point<2>(0,0), Point<2>(w - 1, w - 1));
   IndexSpace is = runtime->create_index_space(ctx, elem_rect);
   runtime->attach_name(is, "is");
-  FieldSpace fs = runtime->create_field_space(ctx);
-  runtime->attach_name(fs, "fs");
+#ifdef PRINT_UPMEM
+  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[0], elem_rect.hi.values[0]);
+  printf("sanity val0 %lld val1 %lld\n", elem_rect.lo.values[1], elem_rect.hi.values[1]);
+#endif
+
+  //create the field space
+  FieldSpace fs_X = runtime->create_field_space(ctx);
+  runtime->attach_name(fs_X, "fs_X");
   {
-    FieldAllocator allocator = runtime->create_field_allocator(ctx, fs);
+    FieldAllocator allocator = runtime->create_field_allocator(ctx, fs_X);
     allocator.allocate_field(sizeof(TYPE), FID_X);
-    runtime->attach_name(fs, FID_X, "X");
-    allocator.allocate_field(sizeof(TYPE), FID_Y);
-    runtime->attach_name(fs, FID_Y, "Y");
-    allocator.allocate_field(sizeof(TYPE), FID_Z);
-    runtime->attach_name(fs, FID_Z, "Z");
+    runtime->attach_name(fs_X, FID_X, "X");
   }
-  LogicalRegion input_lr = runtime->create_logical_region(ctx, is, fs);
-  runtime->attach_name(input_lr, "input_lr");
-  LogicalRegion output_lr = runtime->create_logical_region(ctx, is, fs);
+  FieldSpace fs_Y = runtime->create_field_space(ctx);
+  runtime->attach_name(fs_Y, "fs_Y");
+  {
+    FieldAllocator allocator = runtime->create_field_allocator(ctx, fs_Y);
+    allocator.allocate_field(sizeof(TYPE), FID_Y);
+    runtime->attach_name(fs_Y, FID_Y, "Y");
+  }
+  FieldSpace fs_Z = runtime->create_field_space(ctx);
+  runtime->attach_name(fs_Z, "fs_Z");
+  {
+    FieldAllocator allocator = runtime->create_field_allocator(ctx, fs_Z);
+    allocator.allocate_field(sizeof(TYPE), FID_Z);
+    runtime->attach_name(fs_Z, FID_Z, "Z");
+  }
+
+  //create the logical region
+  LogicalRegion input_lr_X = runtime->create_logical_region(ctx, is_xy, fs_X);
+  runtime->attach_name(input_lr_X, "input_lr_X");
+  LogicalRegion input_lr_Y = runtime->create_logical_region(ctx, is_xy, fs_Y);
+  runtime->attach_name(input_lr_Y, "input_lr_Y");
+  LogicalRegion output_lr = runtime->create_logical_region(ctx, is, fs_Z);
   runtime->attach_name(output_lr, "output_lr");
 
-  PhysicalRegion xy_pr, z_pr;
+  PhysicalRegion x_pr, y_pr, z_pr;
   TYPE *z_ptr = NULL;
-  TYPE *xy_ptr = NULL;
+  TYPE *x_ptr = NULL;
+  TYPE *y_ptr = NULL;
   TYPE *xyz_ptr = NULL;
   if (soa_flag == 0) { // SOA
-    size_t xy_bytes = 2* sizeof(TYPE) * (elems_width * elems_width);
-    xy_ptr = (TYPE *)malloc(xy_bytes);
-    size_t z_bytes = sizeof(TYPE) * (elems_width * elems_width);
+
+    //init the physical region
+    size_t xy_bytes = sizeof(TYPE) * (num_elements_xy);
+    size_t z_bytes = sizeof(TYPE) * (num_elements);
+    x_ptr = (TYPE *)malloc(xy_bytes);
+    y_ptr = (TYPE *)malloc(xy_bytes);
     z_ptr = (TYPE *)malloc(z_bytes);
-    for (int j = 0; j < elems_width * elems_width; j++) {
-      xy_ptr[j] = 1;
-      xy_ptr[elems_width + j] = 1;
-      z_ptr[j] = 1;
+    for (int j = 0; j < num_elements; j++) {
+      z_ptr[j] = RANDOM_NUMBER;
     }
-    // printf("printing the matrix x\n");
-    // for(int m = 0; m<HEIGHT; m++){
-    //   for(int n=0; n<WIDTH; n++){
-    //     printf("%f ", xy_ptr[m*WIDTH + n]);
-    //   }
-    //   printf("\n");
-    // }
-    // printf("printing the matrix y\n");
-    // for(int m = 0; m<HEIGHT; m++){
-    //   for(int n=0; n<WIDTH; n++){
-    //     printf("%f ", xy_ptr[m*WIDTH + n+elems_width]);
-    //   }
-    //   printf("\n");
-    // }
-    
+    for (int j = 0; j < num_elements_xy; j++) {
+      x_ptr[j] = RANDOM_NUMBER;
+      y_ptr[j] = RANDOM_NUMBER;
+    }
+
     {
-      printf("Attach SOA array fid %d, fid %d, ptr %p\n", FID_X, FID_Y, xy_ptr);
-      AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr, input_lr);
-      std::vector<FieldID> attach_fields(2);
+      printf("Attach SOA array fid %d, ptr %p\n", FID_X, x_ptr);
+      AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr_X, input_lr_X);
+      std::vector<FieldID> attach_fields(1);
       attach_fields[0] = FID_X;
-      attach_fields[1] = FID_Y;
       launcher.initialize_constraints(false /*column major*/, true /*soa*/,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
                                        attach_fields.end());
-      Realm::ExternalMemoryResource resource(xy_ptr, xy_bytes);
+      Realm::ExternalMemoryResource resource(x_ptr, xy_bytes);
       launcher.external_resource = &resource;
-      xy_pr = runtime->attach_external_resource(ctx, launcher);
+      x_pr = runtime->attach_external_resource(ctx, launcher);
+    }
+    {
+      printf("Attach SOA array fid %d, ptr %p\n", FID_Y, y_ptr);
+      AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr_Y, input_lr_Y);
+      std::vector<FieldID> attach_fields(1);
+      attach_fields[0] = FID_Y;
+      launcher.initialize_constraints(false /*column major*/, true /*soa*/,
+                                      attach_fields);
+      launcher.privilege_fields.insert(attach_fields.begin(),
+                                       attach_fields.end());
+      Realm::ExternalMemoryResource resource(y_ptr, xy_bytes);
+      launcher.external_resource = &resource;
+      y_pr = runtime->attach_external_resource(ctx, launcher);
     }
     {
       printf("Attach SOA array fid %d, ptr %p\n", FID_Z, z_ptr);
@@ -196,204 +228,151 @@ void top_level_task(const Task *task,
                                       attach_fields);
       launcher.privilege_fields.insert(attach_fields.begin(),
                                        attach_fields.end());
-      Realm::ExternalMemoryResource resource(z_ptr, z_bytes);
+      Realm::ExternalMemoryResource resource(z_ptr, xy_bytes);
       launcher.external_resource = &resource;
       z_pr = runtime->attach_external_resource(ctx, launcher);
     }
-  } else { // AOS
-    size_t total_bytes = sizeof(daxpy_t) * (elems_width * elems_width);
-    daxpy_t *xyz_ptr = (daxpy_t *)malloc(total_bytes);
-    std::vector<FieldID> layout_constraint_fields(3);
-    layout_constraint_fields[0] = FID_X;
-    layout_constraint_fields[1] = FID_Y;
-    layout_constraint_fields[2] = FID_Z;
-    // Need separate attaches for different logical regions,
-    // each launcher gets all the fields in the layout constraint
-    // but only requests privileges on fields for its logical region
-    printf("Attach AOS array ptr %p\n", xyz_ptr);
-    {
-      AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr, input_lr);
-      launcher.initialize_constraints(false /*column major*/, false /*soa*/,
-                                      layout_constraint_fields);
-      launcher.privilege_fields.insert(FID_X);
-      launcher.privilege_fields.insert(FID_Y);
-      Realm::ExternalMemoryResource resource(xyz_ptr, total_bytes);
-      launcher.external_resource = &resource;
-      xy_pr = runtime->attach_external_resource(ctx, launcher);
-    }
-    {
-      AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, output_lr, output_lr);
-      launcher.initialize_constraints(false /*columns major*/, false /*soa*/,
-                                      layout_constraint_fields);
-      launcher.privilege_fields.insert(FID_Z);
-      Realm::ExternalMemoryResource resource(xyz_ptr, total_bytes);
-      launcher.external_resource = &resource;
-      z_pr = runtime->attach_external_resource(ctx, launcher);
-    }
-  }
+  } 
+  // else { // AOS
+  //   size_t total_bytes = sizeof(daxpy_t) * (elems_width * elems_width);
+  //   daxpy_t *xyz_ptr = (daxpy_t *)malloc(total_bytes);
+  //   std::vector<FieldID> layout_constraint_fields(3);
+  //   layout_constraint_fields[0] = FID_X;
+  //   layout_constraint_fields[1] = FID_Y;
+  //   layout_constraint_fields[2] = FID_Z;
+  //   // Need separate attaches for different logical regions,
+  //   // each launcher gets all the fields in the layout constraint
+  //   // but only requests privileges on fields for its logical region
+  //   printf("Attach AOS array ptr %p\n", xyz_ptr);
+  //   {
+  //     AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, input_lr, input_lr);
+  //     launcher.initialize_constraints(false /*column major*/, false /*soa*/,
+  //                                     layout_constraint_fields);
+  //     launcher.privilege_fields.insert(FID_X);
+  //     launcher.privilege_fields.insert(FID_Y);
+  //     Realm::ExternalMemoryResource resource(xyz_ptr, total_bytes);
+  //     launcher.external_resource = &resource;
+  //     xy_pr = runtime->attach_external_resource(ctx, launcher);
+  //   }
+  //   {
+  //     AttachLauncher launcher(LEGION_EXTERNAL_INSTANCE, output_lr, output_lr);
+  //     launcher.initialize_constraints(false /*columns major*/, false /*soa*/,
+  //                                     layout_constraint_fields);
+  //     launcher.privilege_fields.insert(FID_Z);
+  //     Realm::ExternalMemoryResource resource(xyz_ptr, total_bytes);
+  //     launcher.external_resource = &resource;
+  //     z_pr = runtime->attach_external_resource(ctx, launcher);
+  //   }
+  // }
 
-  // In addition to using rectangles and domains for launching index spaces
-  // of tasks (see example 02), Legion also uses them for performing
-  // operations on logical regions.  Here we create a rectangle and a
-  // corresponding domain for describing the space of subregions that we
-  // want to create.  Each subregion is assigned a 'color' which is why
-  // we name the variables 'color_bounds' and 'color_domain'.  We'll use
-  // these below when we partition the region.
-  Rect<2> color_bounds(Point<2>(0,0), Point<2>(num_subregions - 1, num_subregions - 1));
+  // Rect<2> color_bounds(Point<2>(0,0), Point<2>(num_subregions - 1, num_subregions - 1));
+  Rect<1> color_bounds(0, num_subregions - 1);
   IndexSpace color_is = runtime->create_index_space(ctx, color_bounds);
 
-  // Parallelism in Legion is implicit.  This means that rather than
-  // explicitly saying what should run in parallel, Legion applications
-  // partition up data and tasks specify which regions they access.
-  // The Legion runtime computes non-interference as a function of
-  // regions, fields, and privileges and then determines which tasks
-  // are safe to run in parallel.
-  //
-  // Data partitioning is performed on index spaces.  The partitioning
-  // operation is used to break an index space of points into subsets
-  // of points each of which will become a sub index space.  Partitions
-  // created on an index space are then transitively applied to all the
-  // logical regions created using the index space.  We will show how
-  // to get names to the subregions later in this example.
-  //
-  // Here we want to create the IndexPartition 'ip'.  We'll illustrate
-  // two ways of creating an index partition depending on whether the
-  // array being partitioned can be evenly partitioned into subsets
-  // or not.  There are other methods to partitioning index spaces
-  // which are not covered here.  We'll cover the case of coloring
-  // individual points in an index space in our capstone circuit example.
-  IndexPartition ip = runtime->create_equal_partition(ctx, is, color_is);
+  
+  IndexPartition ip = runtime->create_equal_partition(ctx, is_xy, color_is);
   runtime->attach_name(ip, "ip");
 
-  // The index space 'is' was used in creating two logical regions: 'input_lr'
-  // and 'output_lr'.  By creating an IndexPartitiong of 'is' we implicitly
-  // created a LogicalPartition for each of the logical regions created using
-  // 'is'.  The Legion runtime provides several ways of getting the names for
-  // these LogicalPartitions.  We'll look at one of them here.  The
-  // 'get_logical_partition' method takes a LogicalRegion and an IndexPartition
-  // and returns the LogicalPartition of the given LogicalRegion that
-  // corresponds to the given IndexPartition.
-  LogicalPartition input_lp = runtime->get_logical_partition(ctx, input_lr, ip);
-  runtime->attach_name(input_lp, "input_lp");
-  LogicalPartition output_lp =
-      runtime->get_logical_partition(ctx, output_lr, ip);
-  runtime->attach_name(output_lp, "output_lp");
+  LogicalPartition input_lp_X_init = runtime->get_logical_partition(ctx, input_lr_X, ip);
+  runtime->attach_name(input_lp_X_init, "input_lp_X_init");
+  LogicalPartition input_lp_Y_init = runtime->get_logical_partition(ctx, input_lr_Y, ip);
+  runtime->attach_name(input_lp_Y_init, "input_lp_Y_init");
 
   // Create our launch domain.  Note that is the same as color domain
   // as we are going to launch one task for each subregion we created.
-  ArgumentMap arg_map;
+  ArgumentMap arg_map_init;
+  for(int i=0; i<num_subregions; i++){
+    int taskid = num_subregions;
+    arg_map_init.set_point(Point<1>(i), TaskArgument(&taskid, sizeof(int)));
+  }
+
+
   double start_init = get_cur_time();
+  printf("the starting point of the init task\n");
 
-  // As in previous examples, we now want to launch tasks for initializing
-  // both the fields.  However, to increase the amount of parallelism
-  // exposed to the runtime we will launch separate sub-tasks for each of
-  // the logical subregions created by our partitioning.  To express this
-  // we create an IndexLauncher for launching an index space of tasks
-  // the same as example 02.
-  IndexLauncher init_launcher(INIT_FIELD_TASK_ID, color_is,
-                              TaskArgument(NULL, 0), arg_map);
+  IndexLauncher init_launcher_X(INIT_FIELD_TASK_ID, color_is,
+                              TaskArgument(&w, sizeof(int)), arg_map_init);
 
-  // For index space task launches we don't want to have to explicitly
-  // enumerate separate region requirements for all points in our launch
-  // domain.  Instead Legion allows applications to place an upper bound
-  // on privileges required by subtasks and then specify which privileges
-  // each subtask receives using a projection function.  In the case of
-  // the field initialization task, we say that all the subtasks will be
-  // using some subregion of the LogicalPartition 'input_lp'.  Applications
-  // may also specify upper bounds using logical regions and not partitions.
-  //
-  // The Legion implementation assumes that all all points in an index
-  // space task launch request non-interfering privileges and for performance
-  // reasons this is unchecked.  This means if two tasks in the same index
-  // space are accessing aliased data, then they must either both be
-  // with read-only or reduce privileges.
-  //
-  // When the runtime enumerates the launch_domain, it will invoke the
-  // projection function for each point in the space and use the resulting
-  // LogicalRegion computed for each point in the index space of tasks.
-  // The projection ID '0' is reserved and corresponds to the identity
-  // function which simply zips the space of tasks with the space of
-  // subregions in the partition.  Applications can register their own
-  // projections functions via the 'register_region_projection' and
-  // 'register_partition_projection' functions before starting
-  // the runtime similar to how tasks are registered.
-  init_launcher.add_region_requirement(RegionRequirement(
-      input_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr));
-  init_launcher.region_requirements[0].add_field(FID_X);
-  FutureMap fmi0 = runtime->execute_index_space(ctx, init_launcher);
+  init_launcher_X.add_region_requirement(RegionRequirement(
+      input_lp_X_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_X));
+  init_launcher_X.region_requirements[0].add_field(FID_X);
+  FutureMap fmi0 = runtime->execute_index_space(ctx, init_launcher_X);
+  
 
-  // Modify our region requirement to initialize the other field
-  // in the same way.  Note that after we do this we have exposed
-  // 2*num_subregions task-level parallelism to the runtime because
-  // we have launched tasks that are both data-parallel on
-  // sub-regions and task-parallel on accessing different fields.
-  // The power of Legion is that it allows programmers to express
-  // these data usage patterns and automatically extracts both
-  // kinds of parallelism in a unified programming framework.
-  init_launcher.region_requirements[0].privilege_fields.clear();
-  init_launcher.region_requirements[0].instance_fields.clear();
-  init_launcher.region_requirements[0].add_field(FID_Y);
-  FutureMap fmi1 = runtime->execute_index_space(ctx, init_launcher);
+  IndexLauncher init_launcher_Y(INIT_FIELD_TRANSPOSE_TASK_ID, color_is,
+                              TaskArgument(&w, sizeof(int)), arg_map_init);
+  init_launcher_Y.add_region_requirement(RegionRequirement(
+      input_lp_Y_init, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, input_lr_Y));
+  init_launcher_Y.region_requirements[0].add_field(FID_Y);
+  FutureMap fmi1 = runtime->execute_index_space(ctx, init_launcher_Y);
   fmi1.wait_all_results();
   fmi0.wait_all_results();
   double end_init = get_cur_time();
   printf("Attach array, init done, time %f\n", end_init - start_init);
 
-  const TYPE alpha = RANDOM_NUMBER;
-  double start_t = get_cur_time();
+  // const TYPE alpha = RANDOM_NUMBER;
+  // double start_t = get_cur_time();
 
-  DPU_TASK_ARGS args;
-  args.alpha = alpha;
-  args.kernel = kern;
-  // We launch the subtasks for performing the daxpy computation
-  // in a similar way to the initialize field tasks.  Note we
-  // again make use of two RegionRequirements which use a
-  // partition as the upper bound for the privileges for the task.
-  IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is,
-                               TaskArgument(&args, sizeof(DPU_TASK_ARGS)),
-                               arg_map);
-  daxpy_launcher.add_region_requirement(RegionRequirement(
-      input_lp, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr));
-  daxpy_launcher.region_requirements[0].add_field(FID_X);
-  daxpy_launcher.region_requirements[0].add_field(FID_Y);
-  daxpy_launcher.add_region_requirement(RegionRequirement(
-      output_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, output_lr));
-  daxpy_launcher.region_requirements[1].add_field(FID_Z);
-  FutureMap fm = runtime->execute_index_space(ctx, daxpy_launcher);
-  fm.wait_all_results();
-  double end_t = get_cur_time();
-  printf("Attach array, mat multiplication done, time %f\n", end_t - start_t);
+  // DPU_TASK_ARGS args;
+  // args.alpha = alpha;
+  // args.kernel = kern;
+  // // We launch the subtasks for performing the daxpy computation
+  // // in a similar way to the initialize field tasks.  Note we
+  // // again make use of two RegionRequirements which use a
+  // // partition as the upper bound for the privileges for the task.
+  // IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is,
+  //                              TaskArgument(&args, sizeof(DPU_TASK_ARGS)),
+  //                              arg_map);
+  // daxpy_launcher.add_region_requirement(RegionRequirement(
+  //     input_lp, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr));
+  // daxpy_launcher.region_requirements[0].add_field(FID_X);
+  // daxpy_launcher.region_requirements[0].add_field(FID_Y);
+  // daxpy_launcher.add_region_requirement(RegionRequirement(
+  //     output_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, output_lr));
+  // daxpy_launcher.region_requirements[1].add_field(FID_Z);
+  // FutureMap fm = runtime->execute_index_space(ctx, daxpy_launcher);
+  // fm.wait_all_results();
+  // double end_t = get_cur_time();
+  // printf("Attach array, mat multiplication done, time %f\n", end_t - start_t);
 
-  // While we could also issue parallel subtasks for the checking
-  // task, we only issue a single task launch to illustrate an
-  // important Legion concept.  Note the checking task operates
-  // on the entire 'input_lr' and 'output_lr' regions and not
-  // on the subregions.  Even though the previous tasks were
-  // all operating on subregions, Legion will correctly compute
-  // data dependences on all the subtasks that generated the
-  // data in these two regions.
+  // // While we could also issue parallel subtasks for the checking
+  // // task, we only issue a single task launch to illustrate an
+  // // important Legion concept.  Note the checking task operates
+  // // on the entire 'input_lr' and 'output_lr' regions and not
+  // // on the subregions.  Even though the previous tasks were
+  // // all operating on subregions, Legion will correctly compute
+  // // data dependences on all the subtasks that generated the
+  // // data in these two regions.
+  CHECK_TASK_ARGS c_args;
+  c_args.num_subregions = num_subregions;
+  c_args.w = w;
   TaskLauncher check_launcher(CHECK_TASK_ID,
-                              TaskArgument(&alpha, sizeof(alpha)));
-  check_launcher.add_region_requirement(
-      RegionRequirement(input_lr, READ_ONLY, EXCLUSIVE, input_lr));
+                              TaskArgument(&c_args, sizeof(CHECK_TASK_ARGS)));
+  check_launcher.add_region_requirement(RegionRequirement(input_lr_X, READ_ONLY, EXCLUSIVE, input_lr_X));
   check_launcher.region_requirements[0].add_field(FID_X);
-  check_launcher.region_requirements[0].add_field(FID_Y);
-  check_launcher.add_region_requirement(
-      RegionRequirement(output_lr, READ_ONLY, EXCLUSIVE, output_lr));
-  check_launcher.region_requirements[1].add_field(FID_Z);
+  check_launcher.add_region_requirement(RegionRequirement(input_lr_Y, READ_ONLY, EXCLUSIVE, input_lr_Y));
+  check_launcher.region_requirements[1].add_field(FID_Y);
+  check_launcher.add_region_requirement(RegionRequirement(output_lr, READ_ONLY, EXCLUSIVE, output_lr));
+  check_launcher.region_requirements[2].add_field(FID_Z);
   Future fu = runtime->execute_task(ctx, check_launcher);
   fu.wait();
 
-  runtime->detach_external_resource(ctx, xy_pr);
+  runtime->detach_external_resource(ctx, x_pr);
+  runtime->detach_external_resource(ctx, y_pr);
   runtime->detach_external_resource(ctx, z_pr);
-  runtime->destroy_logical_region(ctx, input_lr);
+  runtime->destroy_logical_region(ctx, input_lr_X);
+  runtime->destroy_logical_region(ctx, input_lr_Y);
   runtime->destroy_logical_region(ctx, output_lr);
-  runtime->destroy_field_space(ctx, fs);
+  runtime->destroy_field_space(ctx, fs_X);
+  runtime->destroy_field_space(ctx, fs_Y);
+  runtime->destroy_field_space(ctx, fs_Z);
   runtime->destroy_index_space(ctx, is);
   if (xyz_ptr == NULL)
     free(xyz_ptr);
-  if (xy_ptr == NULL)
-    free(xy_ptr);
+  if (x_ptr == NULL)
+    free(x_ptr);
+  if (y_ptr == NULL)
+    free(y_ptr);
   if (z_ptr == NULL)
     free(z_ptr);
 }
@@ -408,6 +387,9 @@ void init_field_task(const Task *task,
   FieldID fid = *(task->regions[0].privilege_fields.begin());
   const int point = task->index_point.point_data[0];
   printf("Initializing field %d for block %d...\n", fid, point);
+  
+  int num_subregions = *((const int *)task->local_args);
+  const int w = *((const int *)task->args);
 
   const AccessorWD acc(regions[0], fid);
 
@@ -416,117 +398,153 @@ void init_field_task(const Task *task,
   // both as a single task and as part of an index space of tasks.
   Rect<2> rect = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
-      
-  for (PointInRectIterator<2> pir(rect); pir(); pir++) {
-    acc[*pir] = RANDOM_NUMBER;
-  }
+
+  // printf("this is the check task\n");
+  printf("the low value is %lld and %lld\n", rect.lo.values[0], rect.lo.values[1]);
+  printf("the high value is %lld and %lld\n\n", rect.hi.values[0], rect.hi.values[1]);
+  TYPE fixed_value = (double)rect.lo.values[0];
   
+
+  PointInRectIterator<2> *all_iters = new PointInRectIterator<2>[num_subregions];
+  int size_duplication = w*w/num_subregions;
+  for(int i=0; i<num_subregions; i++){
+      PointInRectIterator<2> pir(rect);
+      all_iters[i] = pir;
+      int step = size_duplication * i;
+      for(int j=0; j<step; j++){
+        all_iters[i]++;
+      }
+  }
+
+  for(int i=0; i<size_duplication; i++){
+    TYPE v = fixed_value;
+    for(int j=0; j<num_subregions; j++){
+      acc[*(all_iters[j])] = v;
+      all_iters[j]++;
+    }
+  }
+
+  delete[] all_iters;
+}
+
+void init_field_task_transpose(const Task *task,
+                     const std::vector<PhysicalRegion> &regions, Context ctx,
+                     Runtime *runtime) {
+  assert(regions.size() == 1);
+  assert(task->regions.size() == 1);
+  assert(task->regions[0].privilege_fields.size() == 1);
+
+  FieldID fid = *(task->regions[0].privilege_fields.begin());
+  const int point = task->index_point.point_data[0];
+  printf("Initializing transpose field %d for block %d...\n", fid, point);
+
+  const int w = *((const int *)task->args);
+
+  const AccessorWD acc(regions[0], fid);
+
+  // Note here that we get the domain for the subregion for
+  // this task from the runtime which makes it safe for running
+  // both as a single task and as part of an index space of tasks.
+  Rect<2> rect = runtime->get_index_space_domain(
+      ctx, task->regions[0].region.get_index_space());
+  
+  printf("the low value is %lld and %lld\n", rect.lo.values[0], rect.lo.values[1]);
+  printf("the high value is %lld and %lld\n\n", rect.hi.values[0], rect.hi.values[1]);
+  TYPE fixed_value = (double)rect.lo.values[0];
+  
+
+  if(rect.lo == Point<2>(0, 0)){
+    for (PointInRectIterator<2> pir(rect); pir(); pir++)
+      acc[*pir] = fixed_value;
+  }else{
+    Rect<2> rect_ori;
+    rect_ori.lo = Point<2>(0, 0);
+    rect_ori.hi = Point<2>(w - 1, w - 1);
+    PointInRectIterator<2> pir_ori(rect_ori);
+    for (PointInRectIterator<2> pir(rect); pir(); pir++){
+      acc[*pir] = acc[*pir_ori];
+      pir_ori++;
+    }
+
+  }
 }
 
 void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
                 Context ctx, Runtime *runtime) {
-  assert(regions.size() == 2);
-  assert(task->regions.size() == 2);
-  assert(task->arglen == sizeof(DPU_TASK_ARGS));
-  DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
-  const TYPE alpha = task_args.alpha;
-  const int point = task->index_point.point_data[0];
+//   assert(regions.size() == 2);
+//   assert(task->regions.size() == 2);
+//   assert(task->arglen == sizeof(DPU_TASK_ARGS));
+//   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
+//   const TYPE alpha = task_args.alpha;
+//   const int point = task->index_point.point_data[0];
 
-  const AccessorRO acc_y(regions[0], FID_Y);
-  const AccessorRO acc_x(regions[0], FID_X);
-  const AccessorWD acc_z(regions[1], FID_Z);
+//   const AccessorRO acc_y(regions[0], FID_Y);
+//   const AccessorRO acc_x(regions[0], FID_X);
+//   const AccessorWD acc_z(regions[1], FID_Z);
 
-  Rect<2> rect = runtime->get_index_space_domain(
-      ctx, task->regions[0].region.get_index_space());
-  printf(
-      "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
-      point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
-#ifdef INT32
-  printf(" alpha = %d \n", alpha);
-#elif DOUBLE
-  printf(" alpha = %f \n", alpha);
-#endif
+//   Rect<2> rect = runtime->get_index_space_domain(
+//       ctx, task->regions[0].region.get_index_space());
+//   printf(
+//       "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
+//       point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
+// #ifdef INT32
+//   printf(" alpha = %d \n", alpha);
+// #elif DOUBLE
+//   printf(" alpha = %f \n", alpha);
+// #endif
 
-  {
-    DPU_LAUNCH_ARGS args;
-    // args.width = WIDTH;
-    // args.height = HEIGHT;
-    args.alpha = alpha;
-    args.rect = rect;
-    args.acc_y = acc_y;
-    args.acc_x = acc_x;
-    args.acc_z = acc_z;
-    args.kernel = test;
-    // launch specific upmem kernel
-    task_args.kernel->launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
-  }
+//   {
+//     DPU_LAUNCH_ARGS args;
+//     // args.width = WIDTH;
+//     // args.height = HEIGHT;
+//     args.alpha = alpha;
+//     args.rect = rect;
+//     args.acc_y = acc_y;
+//     args.acc_x = acc_x;
+//     args.acc_z = acc_z;
+//     args.kernel = test;
+//     // launch specific upmem kernel
+//     task_args.kernel->launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+//   }
 }
 
 void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
                 Context ctx, Runtime *runtime) {
-  assert(regions.size() == 2);
-  assert(task->regions.size() == 2);
-  assert(task->arglen == sizeof(TYPE));
-  const TYPE alpha = *((const TYPE *)task->args);
+  assert(regions.size() == 3);
+  assert(task->regions.size() == 3);
 
   const AccessorRO acc_x(regions[0], FID_X);
-  const AccessorRO acc_y(regions[0], FID_Y);
-  const AccessorRO acc_z(regions[1], FID_Z);
+  const AccessorRO acc_y(regions[1], FID_Y);
+  const AccessorRO acc_z(regions[2], FID_Z);
 
-  Rect<2> rect = runtime->get_index_space_domain(
+  Rect<2> rect_z = runtime->get_index_space_domain(
+      ctx, task->regions[2].region.get_index_space());
+
+  Rect<2> rect_xy = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
-  const void *ptr = acc_z.ptr(rect.lo);
-  printf("Checking results... xptr %p, y_ptr %p, z_ptr %p...\n",
-         acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), ptr);
-  bool all_passed = true;
-  size_t count = 0;
-  size_t errors = 0;
-
-  for (PointInRectIterator<2> pir(rect); pir(); pir++) {
-    TYPE received = acc_z[*pir];
-    TYPE expected = 0;
-
-    int row = count / WIDTH;
-    int col = count % WIDTH;
-
-    PointInRectIterator<2> pir_x(rect);
-    PointInRectIterator<2> pir_y(rect);
-
-    for(int i=0; i<row*WIDTH; i++) pir_x++;
-    for(int i=0; i<col*HEIGHT; i++) pir_y++;
-    // pir_x += row*WIDTH;
-    // pir_y += col*HEIGHT;
-
-    for(int i=0; i<WIDTH; i++){
-      // printf("(%f, %f) ", acc_x[*pir] ,acc_y[*pir]);
-
-      expected += acc_x[*pir_x] * acc_y[*pir_y];
-      pir_x++;
-      pir_y++;
-      // count++;
-    }    
-    // PRINT_EXPECTED(expected, received);
-    // printf("location: %ld\n", count);
-    // TYPE expected = alpha * acc_x[*pir] + acc_y[*pir];
-    // Probably shouldn't check for floating point equivalence but
-    // the order of operations are the same should they should
-    // be bitwise equal.
-    if (!COMPARE(expected, received)) {
-      all_passed = false;
-      // PRINT_EXPECTED(expected, received);
-      // printf("location: %ld\n", count);
-      errors++;
-    }
-    count++;
-    // count+=32;
+  CHECK_TASK_ARGS task_args = *((CHECK_TASK_ARGS *)task->args);
+  const int w = task_args.w;
+  const int num_subregions = task_args.num_subregions;
+#ifdef PRINT_UPMEM
+  printf("within the check task, the number of subregions is %d\n", num_subregions);
+  int counter = 0;
+  for(PointInRectIterator<2> pir_xy(rect_xy); pir_xy(); pir_xy++){
+    if(counter % w == 0) printf("\n");
+    printf("%f ", acc_x[*pir_xy]);
+    counter++;
   }
-  if (all_passed)
-    printf("SUCCESS!\n");
-  else {
-    printf("FAILURE!\n");
-    printf("%ld ERRORS WERE FOUND\n", errors);
-    abort();
+
+  printf("\n");
+
+  counter = 0;
+  for(PointInRectIterator<2> pir_xy(rect_xy); pir_xy(); pir_xy++){
+    if(counter % w == 0) printf("\n");
+    printf("%f ", acc_y[*pir_xy]);
+    counter++;
   }
+  
+  printf("\n");
+#endif
 }
 
 int main(int argc, char **argv) {
@@ -543,6 +561,13 @@ int main(int argc, char **argv) {
     registrar.add_constraint(ProcessorConstraint(Processor::LOC_PROC));
     registrar.set_leaf();
     Runtime::preregister_task_variant<init_field_task>(registrar, "init_field");
+  }
+
+  {
+    TaskVariantRegistrar registrar(INIT_FIELD_TRANSPOSE_TASK_ID, "init_field_transpose");
+    registrar.add_constraint(ProcessorConstraint(Processor::LOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<init_field_task_transpose>(registrar, "init_field_transpose");
   }
 
   {

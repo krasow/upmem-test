@@ -22,8 +22,9 @@
 /* Brings in headers to define accessors */
 #include <realm/upmem/upmem_common.h>
 
-#define WIDTH 128
-#define HEIGHT 128
+#define WIDTH 16
+#define HEIGHT 16
+#define NUM_SUBREGIONS 2
 
 
 typedef FieldAccessor<LEGION_READ_ONLY,TYPE,2,coord_t,
@@ -39,14 +40,15 @@ typedef enum DPU_LAUNCH_KERNELS{
 
 
 typedef struct DPU_LAUNCH_ARGS{
-  // size_t width;
-  // size_t height;
-  DPU_LAUNCH_KERNELS kernel;
-  TYPE alpha;
+  int w;
+  int num_subregions;
   Rect<2> rect;
+  Rect<2> rect_x;
+  Rect<2> rect_y;
   AccessorRO acc_y;
   AccessorRO acc_x;
   AccessorWD acc_z;
+  DPU_LAUNCH_KERNELS kernel;
   PADDING(8);
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;
 
