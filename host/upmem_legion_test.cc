@@ -310,39 +310,54 @@ void top_level_task(const Task *task,
   double end_init = get_cur_time();
   printf("Attach array, init done, time %f\n", end_init - start_init);
 
-  // const TYPE alpha = RANDOM_NUMBER;
-  // double start_t = get_cur_time();
 
-  // DPU_TASK_ARGS args;
-  // args.alpha = alpha;
-  // args.kernel = kern;
-  // // We launch the subtasks for performing the daxpy computation
-  // // in a similar way to the initialize field tasks.  Note we
-  // // again make use of two RegionRequirements which use a
-  // // partition as the upper bound for the privileges for the task.
-  // IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is,
-  //                              TaskArgument(&args, sizeof(DPU_TASK_ARGS)),
-  //                              arg_map);
-  // daxpy_launcher.add_region_requirement(RegionRequirement(
-  //     input_lp, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr));
-  // daxpy_launcher.region_requirements[0].add_field(FID_X);
-  // daxpy_launcher.region_requirements[0].add_field(FID_Y);
-  // daxpy_launcher.add_region_requirement(RegionRequirement(
-  //     output_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, output_lr));
-  // daxpy_launcher.region_requirements[1].add_field(FID_Z);
-  // FutureMap fm = runtime->execute_index_space(ctx, daxpy_launcher);
-  // fm.wait_all_results();
-  // double end_t = get_cur_time();
-  // printf("Attach array, mat multiplication done, time %f\n", end_t - start_t);
+  Rect<1> color_bounds_mat(0, num_subregions*num_subregions - 1);
+  IndexSpace color_is_mat = runtime->create_index_space(ctx, color_bounds_mat);
+  IndexPartition ip_mat = runtime->create_equal_partition(ctx, is_xy, color_is_mat);
+  runtime->attach_name(ip_mat, "ip_mat");
 
-  // // While we could also issue parallel subtasks for the checking
-  // // task, we only issue a single task launch to illustrate an
-  // // important Legion concept.  Note the checking task operates
-  // // on the entire 'input_lr' and 'output_lr' regions and not
-  // // on the subregions.  Even though the previous tasks were
-  // // all operating on subregions, Legion will correctly compute
-  // // data dependences on all the subtasks that generated the
-  // // data in these two regions.
+  IndexPartition ip_mat_z = runtime->create_equal_partition(ctx, is, color_is_mat);
+  runtime->attach_name(ip_mat_z, "ip_mat_z");
+  
+  
+  LogicalPartition input_lp_X_mat = runtime->get_logical_partition(ctx, input_lr_X, ip_mat);
+  runtime->attach_name(input_lp_X_mat, "input_lp_X_mat");
+  LogicalPartition input_lp_Y_mat = runtime->get_logical_partition(ctx, input_lr_Y, ip_mat);
+  runtime->attach_name(input_lp_Y_mat, "input_lp_Y_mat");
+  LogicalPartition output_lp = runtime->get_logical_partition(ctx, output_lr, ip_mat_z);
+  runtime->attach_name(output_lp, "output_lp");
+
+  // Create our launch domain.  Note that is the same as color domain
+  // as we are going to launch one task for each subregion we created.
+  ArgumentMap arg_map;
+
+  double start_t = get_cur_time();
+
+  DPU_TASK_ARGS args;
+  args.kernel = kern;
+  args.w = w;
+  args.num_subregions = num_subregions;
+  // We launch the subtasks for performing the daxpy computation
+  // in a similar way to the initialize field tasks.  Note we
+  // again make use of two RegionRequirements which use a
+  // partition as the upper bound for the privileges for the task.
+  IndexLauncher daxpy_launcher(DAXPY_TASK_ID, color_is_mat,
+                               TaskArgument(&args, sizeof(DPU_TASK_ARGS)),
+                               arg_map);
+  daxpy_launcher.add_region_requirement(RegionRequirement(
+      input_lp_X_mat, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_X));
+  daxpy_launcher.add_region_requirement(RegionRequirement(
+      input_lp_Y_mat, 0 /*projection ID*/, READ_ONLY, EXCLUSIVE, input_lr_Y));
+  daxpy_launcher.region_requirements[0].add_field(FID_X);
+  daxpy_launcher.region_requirements[1].add_field(FID_Y);
+  daxpy_launcher.add_region_requirement(RegionRequirement(
+      output_lp, 0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE, output_lr));
+  daxpy_launcher.region_requirements[2].add_field(FID_Z);
+  FutureMap fm = runtime->execute_index_space(ctx, daxpy_launcher);
+  fm.wait_all_results();
+  double end_t = get_cur_time();
+  printf("Attach array, mat multiplication done, time %f\n", end_t - start_t);
+
   CHECK_TASK_ARGS c_args;
   c_args.num_subregions = num_subregions;
   c_args.w = w;
@@ -405,26 +420,30 @@ void init_field_task(const Task *task,
   TYPE fixed_value = (double)rect.lo.values[0];
   
 
-  PointInRectIterator<2> *all_iters = new PointInRectIterator<2>[num_subregions];
-  int size_duplication = w*w/num_subregions;
-  for(int i=0; i<num_subregions; i++){
-      PointInRectIterator<2> pir(rect);
-      all_iters[i] = pir;
-      int step = size_duplication * i;
-      for(int j=0; j<step; j++){
-        all_iters[i]++;
-      }
+  for(PointInRectIterator<2> pir(rect);pir(); pir++){
+    acc[*pir] = fixed_value;
   }
 
-  for(int i=0; i<size_duplication; i++){
-    TYPE v = fixed_value;
-    for(int j=0; j<num_subregions; j++){
-      acc[*(all_iters[j])] = v;
-      all_iters[j]++;
-    }
-  }
+  // PointInRectIterator<2> *all_iters = new PointInRectIterator<2>[num_subregions];
+  // int size_duplication = w*w/num_subregions;
+  // for(int i=0; i<num_subregions; i++){
+  //     PointInRectIterator<2> pir(rect);
+  //     all_iters[i] = pir;
+  //     int step = size_duplication * i;
+  //     for(int j=0; j<step; j++){
+  //       all_iters[i]++;
+  //     }
+  // }
 
-  delete[] all_iters;
+  // for(int i=0; i<size_duplication; i++){
+  //   TYPE v = fixed_value;
+  //   for(int j=0; j<num_subregions; j++){
+  //     acc[*(all_iters[j])] = v;
+  //     all_iters[j]++;
+  //   }
+  // }
+
+  // delete[] all_iters;
 }
 
 void init_field_task_transpose(const Task *task,
@@ -453,59 +472,65 @@ void init_field_task_transpose(const Task *task,
   TYPE fixed_value = (double)rect.lo.values[0];
   
 
-  if(rect.lo == Point<2>(0, 0)){
-    for (PointInRectIterator<2> pir(rect); pir(); pir++)
-      acc[*pir] = fixed_value;
-  }else{
-    Rect<2> rect_ori;
-    rect_ori.lo = Point<2>(0, 0);
-    rect_ori.hi = Point<2>(w - 1, w - 1);
-    PointInRectIterator<2> pir_ori(rect_ori);
-    for (PointInRectIterator<2> pir(rect); pir(); pir++){
-      acc[*pir] = acc[*pir_ori];
-      pir_ori++;
-    }
-
+  for(PointInRectIterator<2> pir(rect); pir(); pir++){
+    acc[*pir] = fixed_value;
   }
+
+  // if(rect.lo == Point<2>(0, 0)){
+  //   for (PointInRectIterator<2> pir(rect); pir(); pir++)
+  //     acc[*pir] = fixed_value;
+  // }else{
+  //   Rect<2> rect_ori;
+  //   rect_ori.lo = Point<2>(0, 0);
+  //   rect_ori.hi = Point<2>(w - 1, w - 1);
+  //   PointInRectIterator<2> pir_ori(rect_ori);
+  //   for (PointInRectIterator<2> pir(rect); pir(); pir++){
+  //     acc[*pir] = acc[*pir_ori];
+  //     pir_ori++;
+  //   }
+
+  // }
 }
 
 void daxpy_task(const Task *task, const std::vector<PhysicalRegion> &regions,
                 Context ctx, Runtime *runtime) {
-//   assert(regions.size() == 2);
-//   assert(task->regions.size() == 2);
-//   assert(task->arglen == sizeof(DPU_TASK_ARGS));
-//   DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
-//   const TYPE alpha = task_args.alpha;
-//   const int point = task->index_point.point_data[0];
+  assert(regions.size() == 3);
+  assert(task->regions.size() == 3);
+  assert(task->arglen == sizeof(DPU_TASK_ARGS));
+  DPU_TASK_ARGS task_args = *((DPU_TASK_ARGS *)task->args);
+  const int point = task->index_point.point_data[0];
+  const int w = task_args.w;
+  const int num_subregions = task_args.num_subregions;
 
-//   const AccessorRO acc_y(regions[0], FID_Y);
-//   const AccessorRO acc_x(regions[0], FID_X);
-//   const AccessorWD acc_z(regions[1], FID_Z);
+  const AccessorRO acc_y(regions[1], FID_Y);
+  const AccessorRO acc_x(regions[0], FID_X);
+  const AccessorWD acc_z(regions[2], FID_Z);
 
-//   Rect<2> rect = runtime->get_index_space_domain(
-//       ctx, task->regions[0].region.get_index_space());
-//   printf(
-//       "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
-//       point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
-// #ifdef INT32
-//   printf(" alpha = %d \n", alpha);
-// #elif DOUBLE
-//   printf(" alpha = %f \n", alpha);
-// #endif
+  Rect<2> rect = runtime->get_index_space_domain(
+      ctx, task->regions[2].region.get_index_space());
+  Rect<2> rect_x = runtime->get_index_space_domain(
+      ctx, task->regions[0].region.get_index_space());
+  Rect<2> rect_y = runtime->get_index_space_domain(
+      ctx, task->regions[1].region.get_index_space());
+  printf(
+      "Running mat multipilication for point %d, xptr %p, y_ptr %p, z_ptr %p...",
+      point, acc_x.ptr(rect.lo), acc_y.ptr(rect.lo), acc_z.ptr(rect.lo));
 
-//   {
-//     DPU_LAUNCH_ARGS args;
-//     // args.width = WIDTH;
-//     // args.height = HEIGHT;
-//     args.alpha = alpha;
-//     args.rect = rect;
-//     args.acc_y = acc_y;
-//     args.acc_x = acc_x;
-//     args.acc_z = acc_z;
-//     args.kernel = test;
-//     // launch specific upmem kernel
-//     task_args.kernel->launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
-//   }
+
+  {
+    DPU_LAUNCH_ARGS args;
+    args.w = w;
+    args.num_subregions = num_subregions;
+    args.rect = rect;
+    args.rect_x = rect_x;
+    args.rect_y = rect_y;
+    args.acc_y = acc_y;
+    args.acc_x = acc_x;
+    args.acc_z = acc_z;
+    args.kernel = test;
+    // launch specific upmem kernel
+    task_args.kernel->launch((void **)&args, "ARGS", sizeof(DPU_LAUNCH_ARGS));
+  }
 }
 
 void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
@@ -530,7 +555,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   int counter = 0;
   for(PointInRectIterator<2> pir_xy(rect_xy); pir_xy(); pir_xy++){
     if(counter % w == 0) printf("\n");
-    printf("%f ", acc_x[*pir_xy]);
+    printf("%*.*f ", 2, 3 ,acc_x[*pir_xy]);
     counter++;
   }
 
@@ -539,7 +564,7 @@ void check_task(const Task *task, const std::vector<PhysicalRegion> &regions,
   counter = 0;
   for(PointInRectIterator<2> pir_xy(rect_xy); pir_xy(); pir_xy++){
     if(counter % w == 0) printf("\n");
-    printf("%f ", acc_y[*pir_xy]);
+    printf("%*.*f ", 2, 3, acc_y[*pir_xy]);
     counter++;
   }
   
