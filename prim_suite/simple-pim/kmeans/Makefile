@@ -1,0 +1,3 @@
+kmeans: host.c
+	@mkdir -p bin
+	gcc --std=c99 -ldl -lm -fopenmp -O3 host.c -o bin/host $(SIMPLE_PIM_LIB)/processing/ProcessingHelperHost.c $(SIMPLE_PIM_LIB)/communication/CommHelper.c $(SIMPLE_PIM_LIB)/communication/CommOps.c $(SIMPLE_PIM_LIB)/management/SmallTableInit.c $(SIMPLE_PIM_LIB)/management/Management.c $(SIMPLE_PIM_LIB)/processing/gen_red/GenRed.c `dpu-pkg-config --cflags --libs dpu` -I$(SIMPLE_PIM_LIB)

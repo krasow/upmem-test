@@ -30,6 +30,9 @@ def main():
     parser.add_argument(
         "--build_cmd", type=str, help="Custom build command.", default="make"
     )
+    parser.add_argument(
+        "--run_cmd", type=str, help="Custom run command.", default="upmem_test"
+    )
 
     args = parser.parse_args()
 
@@ -46,7 +49,7 @@ def main():
 
     # Step 2: Run the benchmark with additional arguments
     print(f"Running benchmark in: {benchmark_path}")
-    benchmark_command = f"./upmem_test {args.args}"
+    benchmark_command = f"{args.run_cmd} {args.args}"
     run_command(benchmark_command, cwd=benchmark_path)
 
 if __name__ == "__main__":

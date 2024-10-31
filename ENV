@@ -1,5 +1,6 @@
 BASEDIR=$(pwd)/libs
 export PATH="${BASEDIR}/gasnet/release/bin":$PATH
 export LG_RT_DIR="${BASEDIR}/upmem-legion/runtime"
+export SIMPLE_PIM_LIB="${BASEDIR}/SimplePIM/lib"
 #export GASNET="${BASEDIR}/libs/gasnet/release"
 source ${BASEDIR}/upmem-2024.1.0-Linux-x86_64/upmem_env.sh simulator 
