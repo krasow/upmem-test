@@ -62,7 +62,7 @@ void run(){
     stop(&timer, 0);
     printf("end of data transfer\n");
 
-    handle_t* add_handle = create_handle("va_funcs", MAP);
+    handle_t* add_handle = create_handle("daxby_funcs", MAP);
     handle_t* zip_handle = create_handle("", ZIP);
 
 

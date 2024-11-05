@@ -27,7 +27,7 @@ extern "C" {
 /* common header between device and host */
 #include <common.h>
 
-#define BLOCK_SIZE 64
+#define BLOCK_SIZE 32
 
 typedef struct __DPU_LAUNCH_ARGS {
   char paddd[256];
@@ -75,9 +75,9 @@ int main_kernel1() {
   AccessorWD block_acc_z;
 
   // set base pointer for the new block accessors
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
-  block_acc_y.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc(BLOCK_SIZE * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
+  block_acc_y.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
+  block_acc_z.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
