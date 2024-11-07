@@ -1,14 +1,12 @@
 #!/bin/bash
 
-benchmark=daxby
-model=legion-pim
-
+scripts=python_scripts
 
 for dpus in 4 8 16 32; do
   subregions=$dpus
   for exp in {10..20}; do
     num_elems=$((2**exp))
-    python3 run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out"
+    python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out"
     
 cat > ./daxby/simple-pim/Param.h <<EOF
     #ifndef PARAM_H
@@ -21,6 +19,6 @@ cat > ./daxby/simple-pim/Param.h <<EOF
     #endif
 EOF
     
-  python3 run.py daxby simple-pim --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out"
+  python3 $scripts/run.py daxby simple-pim --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out"
   done
 done

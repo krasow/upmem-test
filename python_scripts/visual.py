@@ -12,15 +12,13 @@ output_png = args.output_png
 
 df = pd.read_csv(csv)
 
-# Plot the data
 plt.figure(figsize=(10,6))
 
-
 grouped = df.groupby('Number of Elements')
-for elems, group in grouped:
+for elems, g in grouped:
+    group = g.sort_values(['Number of DPUs'])
     plt.plot(group['Number of DPUs'], group['Walltime [sec]'], marker='o', label=f'Elements = {elems}')
 
-# Adding labels and title
 plt.title('Wall Time vs Number of DPUs')
 plt.xlabel('Number of DPUs')
 plt.ylabel('Wall Time (sec)')
