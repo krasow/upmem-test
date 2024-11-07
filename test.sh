@@ -1,7 +1,5 @@
 #!/bin/bash
-
 scripts=python_scripts
-
 for dpus in 4 8 16 32; do
   subregions=$dpus
   for exp in {10..20}; do
