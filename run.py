@@ -12,6 +12,7 @@ def run_command(command, cwd=None):
             cwd=cwd,
             text=True,
             check=True,
+            executable='/bin/bash',
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -31,7 +32,13 @@ def main():
         "--build_cmd", type=str, help="Custom build command.", default="make"
     )
     parser.add_argument(
-        "--run_cmd", type=str, help="Custom run command.", default="upmem_test"
+        "--run_cmd", type=str, help="Custom run command.", default="./upmem_test"
+    )
+    parser.add_argument(
+        "--time_output", type=str, help="Timing output file", default="output.run"
+    )
+    parser.add_argument(
+        "--compile_defines", type=str, help="Compiler Defines.", default=""
     )
 
     args = parser.parse_args()
@@ -42,14 +49,16 @@ def main():
     if not os.path.exists(benchmark_path):
         print(f"Error: The path '{benchmark_path}' does not exist.")
         sys.exit(1)
-
+    
     # Step 1: Run the build command
     print(f"Building in: {benchmark_path}")
-    run_command(args.build_cmd, cwd=benchmark_path)
+    build_cmd = f"{args.compile_defines} {args.build_cmd}"
+    run_command(build_cmd, cwd=benchmark_path)
 
     # Step 2: Run the benchmark with additional arguments
     print(f"Running benchmark in: {benchmark_path}")
-    benchmark_command = f"{args.run_cmd} {args.args}"
+    benchmark_command = f"/usr/bin/time -o {args.time_output} {args.run_cmd} {args.args}"
+    print(f"Benchmark command: {benchmark_command}")
     run_command(benchmark_command, cwd=benchmark_path)
 
 if __name__ == "__main__":

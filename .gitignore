@@ -30,7 +30,7 @@ core
 *.bbl
 *.blg
 *.aux
-
+*.csv
 legion_defines.h*
 realm_defines.h*
 
