@@ -1,6 +1,6 @@
-[submodule "libs/SimplePIM"]
-	path = libs/SimplePIM
-	url = https://github.com/krasow/simple-pim-clone
 [submodule "libs/upmem-legion"]
 	path = libs/upmem-legion
 	url = https://github.com/PrescienceLab/upmem-legion
+[submodule "libs/simple-pim-clone"]
+	path = libs/simple-pim-clone
+	url = https://github.com/krasow/simple-pim-clone
