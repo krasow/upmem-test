@@ -1,7 +1,10 @@
 #!/bin/bash
 scripts=python_scripts
+stderr=error.out
+stdout=test.out
 
-# https://www.baeldung.com/linux/command-line-progress-bar
+
+# progress bar https://www.baeldung.com/linux/command-line-progress-bar
 
 bar_size=40
 bar_char_done="#"
@@ -25,7 +28,13 @@ function show_progress {
   fi
 }
 
+if [ -f $stderr ]; then
+  rm $stderr
+fi
 
+if [ -f $stdout ]; then
+  rm $stdout
+fi
 
 i=0
 for dpus in 4 8 16 32; do
@@ -33,20 +42,21 @@ for dpus in 4 8 16 32; do
   for exp in {15..20}; do
     show_progress $i 23
     num_elems=$((2**exp))
-    python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> test.out 2>> error.out
+    python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> $stdout 2>> $stderr
     
 cat > ./daxby/simple-pim/Param.h <<EOF
     #ifndef PARAM_H
     #define PARAM_H
+    #include <stdint.h>
     #include <stdlib.h>
-    typedef double T; 
+    typedef int32_t T; 
     const uint32_t dpu_number = ${dpus};
     uint32_t print_info = 0;
     uint64_t nr_elements = ${num_elems};
     #endif
 EOF
     
-  python3 $scripts/run.py daxby simple-pim --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> test.out 2>> error.out
+  python3 $scripts/run.py daxby simple-pim --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> $stdout 2>> $stderr
   i=$((i + 1))  
 done
 done

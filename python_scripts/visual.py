@@ -18,7 +18,7 @@ plt.figure(figsize=(10,6))
 grouped = df.groupby('Number of Elements')
 for elems, g in grouped:
     group = g.sort_values(['Number of DPUs'])
-    plt.plot(group['Number of DPUs'], group['Walltime [sec]'], marker='o', label=f'Elements = {elems}')
+    plt.plot(group['Number of DPUs'], group['Walltime [sec]'], marker='o', label=f'{elems}')
 title = f"{args.model} : Wall Time vs DPUs"
 plt.title(title)
 plt.xlabel('Number of DPUs')
@@ -27,3 +27,5 @@ plt.legend(title='Number of Elements', bbox_to_anchor=(1.05, 1), loc='upper left
 plt.grid(True)
 plt.tight_layout()
 plt.savefig(output_png)
+
+print(f"plot {output_png} created.")
