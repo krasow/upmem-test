@@ -40,9 +40,7 @@ i=0
 for dpus in 4 8 16 32; do
   subregions=$dpus
   for exp in {15..20}; do
-    show_progress $i 23
     num_elems=$((2**exp))
-    python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> $stdout 2>> $stderr
     
 cat > ./daxby/simple-pim/Param.h <<EOF
     #ifndef PARAM_H
@@ -55,9 +53,13 @@ cat > ./daxby/simple-pim/Param.h <<EOF
     uint64_t nr_elements = ${num_elems};
     #endif
 EOF
-    
-  python3 $scripts/run.py daxby simple-pim --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}.out" >> $stdout 2>> $stderr
-  i=$((i + 1))  
+
+  for trial in {1..20}; do  
+    show_progress $i 479
+    python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
+    python3 $scripts/run.py daxby simple-pim  --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
+    i=$((i + 1))  
+done
 done
 done
 

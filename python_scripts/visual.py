@@ -12,13 +12,17 @@ output_png = args.output_png
 
 
 df = pd.read_csv(csv)
-
 plt.figure(figsize=(10,6))
 
-grouped = df.groupby('Number of Elements')
-for elems, g in grouped:
-    group = g.sort_values(['Number of DPUs'])
-    plt.plot(group['Number of DPUs'], group['Walltime [sec]'], marker='o', label=f'{elems}')
+# drop columns
+df = df.drop(columns=['Wall Time [hour:min:sec]', 'Filename', 'Benchmark'])
+
+# group by trial
+grouped = df.groupby(['Number of Elements', 'Number of DPUs']).agg({'Walltime [sec]': 'mean'}).reset_index()
+
+for elem, group in grouped.groupby('Number of Elements'):
+    plt.plot(group['Number of DPUs'], group['Walltime [sec]'], marker='o', label=f'{elem}')
+
 title = f"{args.model} : Wall Time vs DPUs"
 plt.title(title)
 plt.xlabel('Number of DPUs')
