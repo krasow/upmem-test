@@ -33,13 +33,14 @@ typedef enum DPU_LAUNCH_KERNELS{
   nr_kernels = 1
 } DPU_LAUNCH_KERNELS;
 
-
+//alpha will stand for the bins
 typedef struct DPU_LAUNCH_ARGS{
-  TYPE alpha;
+  TYPE bins;
+  TYPE depth;
   Rect<1> rect;
-  AccessorRO acc_y;
+  Rect<1> rect_y;
+  AccessorWD acc_y;
   AccessorRO acc_x;
-  AccessorWD acc_z;
   DPU_LAUNCH_KERNELS kernel;
   PADDING(8);
 } __attribute__((aligned(8))) DPU_LAUNCH_ARGS;

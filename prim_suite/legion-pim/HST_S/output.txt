@@ -1,0 +1,2080 @@
+Running with 16 Tasklets per DPU
+Running HST-S for 16384 elements...
+Partitioning data into 4 sub-regions...
+Attach SOA array fid 0, ptr 0x7f064402aa70
+Attach SOA array fid 1, ptr 0x7f0644020280
+Initializing field 0 for block 0...
+Initializing field 0 for block 1...
+Initializing field 0 for block 2...
+Initializing field 0 for block 3...
+Attach array, init done, time 0.030898
+Running HST computation for point 0, xptr 0x147b08...
+The low value is 0
+Running HST computation for point 1, xptr 0x14bb08...
+The low value is 4096
+Running HST computation for point 2, xptr 0x14fb08...
+The low value is 8192
+Running HST computation for point 3, xptr 0x153b08...
+The low value is 12288
+=== DPU#0x20000 ===
+DEVICE:::: Running HST computation with xptr 0x14fb08DEVICE::: my tasklet id is 0, the lower bound of the rect is 0 
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+=== DPU#0x10000 ===
+DEVICE:::: Running HST computation with xptr 0x14bb08DEVICE::: my tasklet id is 0, the lower bound of the rect is 0 
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+=== DPU#0x30000 ===
+DEVICE:::: Running HST computation with xptr 0x153b08DEVICE::: my tasklet id is 0, the lower bound of the rect is 0 
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+=== DPU#0x0 ===
+DEVICE:::: Running HST computation with xptr 0x147b08DEVICE::: my tasklet id is 0, the lower bound of the rect is 0 
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 3
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 2
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 1
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 2
+the value is 0
+the value is 1
+the value is 0
+the value is 1
+the value is 0
+the value is 1
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 2
+the value is 0
+the value is 0
+the value is 0
+the value is 1
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+the value is 0
+Attach array, HST done, time 0.659083
+the resulting values are:
+0
+0
+1
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+3
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+2
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+2
+0
+1
+0
+1
+0
+1
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+2
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+1
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+1
+0
+0
+1
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+1
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+1
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+2
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+2
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+0
+1
+0
+0
+1
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+2
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+1
+1
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+2
+0
+1
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+1
+0
+0
+0
+0
+0
+1
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+1
+0
+0
+0
+0
+0
+0
+1
+1
+0
+0
+0
+0
+0
+0
+0

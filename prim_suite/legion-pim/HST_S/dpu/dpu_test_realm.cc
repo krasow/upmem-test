@@ -51,18 +51,10 @@ int main_kernel1() {
 
 #ifdef PRINT_UPMEM
   if (tasklet_id == 0) {
-    printf("DEVICE:::: Running daxpy computation with xptr %p, y_ptr %p, z_ptr "
-           "%p...",
-           args->acc_x.ptr(args->rect.lo), args->acc_y.ptr(args->rect.lo),
-           args->acc_z.ptr(args->rect.lo));
+    printf("DEVICE:::: Running HST computation with xptr %p",
+           args->acc_x.ptr(args->rect.lo));
 
-    printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect.lo.value);
-
-#ifdef INT32
-    printf(" alpha = %d \n", args->alpha);
-#elif DOUBLE
-    printf(" alpha = %f \n", args->alpha);
-#endif
+    printf("DEVICE::: my tasklet id is %d, the lower bound of the rect is %d \n", tasklet_id, args->rect_y.lo.value);
   }
 #endif
 
@@ -70,18 +62,15 @@ int main_kernel1() {
   rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE;
   rect.hi = args->rect.hi;
 
-  AccessorRO block_acc_y;
+  AccessorWD block_acc_y;
   AccessorRO block_acc_x;
-  AccessorWD block_acc_z;
 
   // set base pointer for the new block accessors
-  block_acc_x.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
-  block_acc_y.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
-  block_acc_z.accessor.base = (uintptr_t)mem_alloc((1+BLOCK_SIZE) * sizeof(TYPE));
+  block_acc_x.accessor.base = (uintptr_t)mem_alloc((BLOCK_SIZE) * sizeof(TYPE));
+  block_acc_y.accessor.base = (uintptr_t)mem_alloc((args->bins) * sizeof(TYPE));
   // set strides from base accessor
   block_acc_x.accessor.strides = args->acc_x.accessor.strides;
   block_acc_y.accessor.strides = args->acc_y.accessor.strides;
-  block_acc_z.accessor.strides = args->acc_z.accessor.strides;
 
 
 // #ifdef PRINT_UPMEM
@@ -102,31 +91,63 @@ int main_kernel1() {
 //   }
 // #endif
 
+  Rect<1> output_rect;
+  output_rect.lo = args->rect_y.lo;
+  output_rect.hi = args->rect_y.lo+256;
+  Legion::PointInRectIterator<1> output_pir(output_rect);
+  READ_BLOCK(*output_pir, args->acc_y, block_acc_y, args->bins * sizeof(TYPE));
 
-  // iterator through all elements
+
+  // iterate through all elements
   for (Legion::PointInRectIterator<1> pir(rect); pir();
        pir += (NR_TASKLETS * BLOCK_SIZE)) {
 
     // read blocks to respective base pointers
     // #define READ_BLOCK(point, acc_full, acc_block, bytes)
     READ_BLOCK(*pir, args->acc_x, block_acc_x, BLOCK_SIZE * sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_y, block_acc_y, BLOCK_SIZE * sizeof(TYPE));
-    READ_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
+    // READ_BLOCK(*output_pir, args->acc_y, block_acc_y, args->bins * sizeof(TYPE));
 
     Rect<1> block_rect;
     block_rect.lo = 0;
-    block_rect.hi = BLOCK_SIZE;
+    block_rect.hi = BLOCK_SIZE-1;
+
+    Rect<1> bin_rect;
+    bin_rect.lo = 0;
+    bin_rect.hi = 256-1;
 
     // block iterator
     for (Legion::PointInRectIterator<1> pir_block(block_rect); pir_block();
          pir_block++) {
-      block_acc_z.write(*pir_block, args->alpha * block_acc_x[*pir_block] +
-                                        block_acc_y[*pir_block]);
+
+      TYPE curr_val = block_acc_x[*pir_block];
+      int bin_index = curr_val * args->bins >> args->depth;
+      Legion::PointInRectIterator<1> output_pir_block(bin_rect);
+      output_pir_block += (bin_index);
+      // for(int i=0; i<bin_index; i++) output_pir_block++;
+
+// #ifdef PRINT_UPMEM
+//       printf("the current value is %d and the corresponding index is %d\n", curr_val, bin_index);
+// #endif
+
+
+      TYPE ori_bin_val = block_acc_y[*output_pir_block];
+
+      block_acc_y.write(*output_pir_block, ori_bin_val + 1);
     }
 
     // write block
     // #define WRITE_BLOCK(point, acc_full, acc_block, bytes)
-    WRITE_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
+    // WRITE_BLOCK(*pir, args->acc_z, block_acc_z, BLOCK_SIZE * sizeof(TYPE));
   }
+
+#ifdef PRINT_UPMEM
+  for (Legion::PointInRectIterator<1> pir_block(output_rect); pir_block(); pir_block++) {
+    printf("the value is %d\n", block_acc_y[*pir_block]);
+  }
+  // fflush(stdout);
+#endif
+
+  WRITE_BLOCK(*output_pir, args->acc_y, block_acc_y, args->bins * sizeof(TYPE));
+
   return 0;
 }
