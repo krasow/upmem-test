@@ -66,6 +66,7 @@ int main_kernel1() {
   }
 #endif
 
+  
   Rect<1> rect;
   rect.lo = args->rect.lo + tasklet_id * BLOCK_SIZE;
   rect.hi = args->rect.hi;
