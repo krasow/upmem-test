@@ -37,9 +37,9 @@ if [ -f $stdout ]; then
 fi
 
 i=0
-for dpus in 4 8 16 32; do
+for dpus in 4 8 16 32 64; do
   subregions=$dpus
-  for exp in {15..20}; do
+  for exp in {15..22}; do
     num_elems=$((2**exp))
     
 cat > ./daxby/simple-pim/Param.h <<EOF
@@ -54,8 +54,8 @@ cat > ./daxby/simple-pim/Param.h <<EOF
     #endif
 EOF
 
-  for trial in {1..20}; do  
-    show_progress $i 479
+  for trial in {1..10}; do  
+    show_progress $i $((5 * 8 * 10))
     python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
     python3 $scripts/run.py daxby simple-pim  --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
     i=$((i + 1))  
