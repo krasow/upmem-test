@@ -1,6 +1,8 @@
 upmem_legion
 upmem-*-Linux-*
 SimplePIM
+*.run
+*.txt
 *.o
 *.out
 *.a
