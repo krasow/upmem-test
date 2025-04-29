@@ -36,17 +36,11 @@ if [ -f $stdout ]; then
   rm $stdout
 fi
 
-i=1
-
-fixed_exp=22  # Keep problem size constant
-num_elems=$((2**fixed_exp))
-dpus_list=(4 8 16 32 64)
-trials=10
-total=$(( ${#dpus_list[@]} * trials ))
-
-
-for dpus in "${dpus_list[@]}"; do
+i=0
+for dpus in 4 8 16 32 64; do
   subregions=$dpus
+  for exp in {15..22}; do
+    num_elems=$((2**exp))
     
 cat > ./daxby/simple-pim/Param.h <<EOF
     #ifndef PARAM_H
@@ -60,15 +54,14 @@ cat > ./daxby/simple-pim/Param.h <<EOF
     #endif
 EOF
 
-  for trial in $(seq 1 $trials); do
-    show_progress $i $total
+  for trial in {1..10}; do  
     show_progress $i $((5 * 8 * 10))
     python3 $scripts/run.py daxby legion-pim --args "-ll:num_dpus ${dpus} -b ${subregions} -n ${num_elems}" --build_cmd "make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
     python3 $scripts/run.py daxby simple-pim  --run_cmd "./bin/host" --build_cmd "make clean && make -j" --time_output "daxby_dpu${dpus}elem${num_elems}trial${trial}.out" >> $stdout 2>> $stderr
     i=$((i + 1))  
 done
 done
-
+done
 
 echo "STDERR output below"
 cat error.out
