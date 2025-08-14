@@ -1,14 +1,17 @@
 cd libs
 # upmem runtime
-wget http://sdk-releases.upmem.com/2024.1.0/ubuntu_22.04/upmem-2024.1.0-Linux-x86_64.tar.gz
+# wget http://sdk-releases.upmem.com/2024.1.0/ubuntu_22.04/upmem-2024.1.0-Linux-x86_64.tar.gz
 # wget http://sdk-releases.upmem.com/2024.1.0/rocky_8/upmem-2024.1.0-Linux-x86_64.tar.gz
 # wget http://sdk-releases.upmem.com/2023.2.0/centos_7/upmem-2023.2.0-Linux-x86_64.tar.gz
 
-tar -xf upmem-2024.1.0-Linux-x86_64.tar.gz
-rm upmem-2024.1.0-Linux-x86_64.tar.gz
+# for this machine, debian
+wget https://cheesemonger.cs.northwestern.edu/upmem/software/upmem-2025.1.0-Linux-x86_64.tar.gz
+
+tar -xf upmem-2025.1.0-Linux-x86_64.tar.gz
+rm upmem-2025.1.0-Linux-x86_64.tar.gz
 
 # patch upmem runtime
-cat > ./upmem-2024.1.0-Linux-x86_64/share/upmem/include/stdlib/stddef.h <<EOF
+cat > ./upmem-2025.1.0-Linux-x86_64/share/upmem/include/stdlib/stddef.h <<EOF
 /* Copyright 2020 UPMEM. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
